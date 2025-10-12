@@ -1,7 +1,6 @@
-// ============================================================================
-// FILE 1: src/components/tutorial/Tutorial.tsx
+// src/components/tutorial/Tutorial.tsx
 // Reusable tutorial/onboarding component with spotlight effect
-// ============================================================================
+// Optimized for mobile with fixed bottom positioning and scrollable content
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
@@ -48,6 +47,7 @@ export interface TutorialProps {
  * - Step-by-step navigation
  * - Keyboard support (ESC to close, Arrow keys to navigate)
  * - Responsive tooltip positioning
+ * - Mobile-optimized: fixed bottom position with scrollable content
  * - Smooth transitions
  * 
  * @example
@@ -74,13 +74,14 @@ export default function Tutorial({
   const [currentStep, setCurrentStep] = useState(0);
   const [highlightRect, setHighlightRect] = useState<DOMRect | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
 
   const totalSteps = steps.length;
   const step = steps[currentStep];
 
   /**
-   * Update highlighted element position and scroll to center
-   * Optimized for speed and large elements
+   * Update highlighted element position and scroll to it
+   * Mobile optimized: gentle scrolling with space for tooltip
    */
   const updateHighlight = useCallback(() => {
     if (!step?.target) {
@@ -90,39 +91,46 @@ export default function Tutorial({
 
     const element = document.querySelector(step.target);
     if (!element) {
+      console.warn(`Tutorial: Element not found for selector "${step.target}"`);
       setHighlightRect(null);
       return;
     }
 
-    // Get current scroll position
     const currentScrollY = window.scrollY;
-    
-    // Get element position relative to document
     const elementRect = element.getBoundingClientRect();
     const absoluteTop = elementRect.top + currentScrollY;
     const elementHeight = elementRect.height;
-    
-    // Calculate where to scroll
     const viewportHeight = window.innerHeight;
     
-    // For large elements, align to top with some padding
-    // For small elements, center them
+    // Detect mobile viewport
+    const isMobile = window.innerWidth < 640;
+    
+    // Calculate scroll position
     let targetScrollY;
-    if (elementHeight > viewportHeight * 0.7) {
-      // Large element: align to top with 80px padding
+    
+    if (isMobile) {
+      // Mobile: scroll element to upper 20% of viewport, leaving space for tooltip at bottom
+      targetScrollY = absoluteTop - (viewportHeight * 0.2);
+      
+      // For large elements, align to top instead
+      if (elementHeight > viewportHeight * 0.3) {
+        targetScrollY = absoluteTop - 80;
+      }
+    } else if (elementHeight > viewportHeight * 0.7) {
+      // Desktop large element: align to top
       targetScrollY = absoluteTop - 80;
     } else {
-      // Small element: center it
+      // Desktop small element: center in viewport
       targetScrollY = absoluteTop - (viewportHeight / 2) + (elementHeight / 2);
     }
     
-    // Use instant scroll for better performance
+    // Instant scroll for better performance
     window.scrollTo({
       top: Math.max(0, targetScrollY),
-      behavior: "auto", // Changed from "smooth" to "auto" for instant scroll
+      behavior: "auto",
     });
     
-    // Immediately update highlight rect (no delay needed)
+    // Get rect after scroll completes
     requestAnimationFrame(() => {
       const newRect = element.getBoundingClientRect();
       setHighlightRect(newRect);
@@ -130,7 +138,166 @@ export default function Tutorial({
   }, [step]);
 
   /**
-   * Go to next step
+   * Calculate tooltip position style
+   * Mobile: fixed at bottom with limited height
+   * Desktop: smart positioning around highlighted element
+   */
+  const getTooltipStyle = (): React.CSSProperties => {
+    if (!highlightRect) {
+      return { display: "none" };
+    }
+
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    
+    // Responsive breakpoints (Tailwind-style)
+    const isMobile = viewportWidth < 640; // < sm
+    const isTablet = viewportWidth >= 640 && viewportWidth < 1024; // sm to lg
+
+    const style: React.CSSProperties = {
+      position: "fixed",
+      zIndex: (zIndex || 9999) + 2,
+    };
+
+    // Mobile: fixed bottom with limited height and scrollable content
+    if (isMobile) {
+      return {
+        ...style,
+        bottom: "16px",
+        left: "16px",
+        right: "16px",
+        width: "auto",
+        maxHeight: "40vh", // Limited height to ensure element visibility
+        display: "flex",
+        flexDirection: "column",
+      };
+    }
+
+    // Tablet: bottom center with moderate width
+    if (isTablet) {
+      return {
+        ...style,
+        bottom: "20px",
+        left: "50%",
+        transform: "translateX(-50%)",
+        width: "calc(100% - 60px)",
+        maxWidth: "500px",
+        maxHeight: "50vh",
+      };
+    }
+
+    // Desktop: smart positioning based on available space
+    const isLargeElement = highlightRect.height > viewportHeight * 0.6;
+    const padding = 24;
+    
+    if (isLargeElement) {
+      const spaceRight = viewportWidth - highlightRect.right;
+      
+      
+      // Large element: prefer right side, fallback to bottom center
+      if (spaceRight > 420) {
+        return {
+          ...style,
+          left: `${highlightRect.right + padding}px`,
+          top: `${Math.max(20, highlightRect.top)}px`,
+          width: "400px",
+          maxWidth: `${spaceRight - padding - 20}px`,
+          maxHeight: "60vh",
+        };
+      }
+      
+      // Not enough space on right: bottom center with backdrop
+      return {
+        ...style,
+        bottom: "40px",
+        left: "50%",
+        transform: "translateX(-50%)",
+        width: "450px",
+        maxWidth: "calc(100vw - 80px)",
+        maxHeight: "60vh",
+        backgroundColor: "rgba(255, 255, 255, 0.98)",
+        backdropFilter: "blur(8px)",
+      };
+    }
+
+    // Normal elements: position relative to highlight based on placement
+    const placement = step.placement || "bottom";
+    const spaceTop = highlightRect.top;
+    const spaceBottom = viewportHeight - highlightRect.bottom;
+    const spaceLeft = highlightRect.left;
+    const spaceRight = viewportWidth - highlightRect.right;
+
+    // Check available space in each direction
+    const hasSpaceBottom = spaceBottom > 220;
+    const hasSpaceTop = spaceTop > 220;
+    const hasSpaceRight = spaceRight > 420;
+    const hasSpaceLeft = spaceLeft > 420;
+    
+    // No space available: center overlay with backdrop
+    if (!hasSpaceBottom && !hasSpaceTop && !hasSpaceRight && !hasSpaceLeft) {
+      return {
+        ...style,
+        top: "50%",
+        left: "50%",
+        transform: "translate(-50%, -50%)",
+        width: "min(450px, calc(100vw - 40px))",
+        maxHeight: "70vh",
+        backgroundColor: "rgba(255, 255, 255, 0.98)",
+        backdropFilter: "blur(8px)",
+      };
+    }
+
+    // Auto-adjust placement based on available space
+    let finalPlacement = placement;
+    if (placement === "bottom" && !hasSpaceBottom) {
+      finalPlacement = hasSpaceTop ? "top" : (hasSpaceRight ? "right" : "left");
+    } else if (placement === "top" && !hasSpaceTop) {
+      finalPlacement = hasSpaceBottom ? "bottom" : (hasSpaceRight ? "right" : "left");
+    }
+
+    // Apply positioning based on final placement
+    switch (finalPlacement) {
+      case "top":
+        return {
+          ...style,
+          bottom: `${viewportHeight - highlightRect.top + padding}px`,
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: "min(450px, calc(100vw - 40px))",
+          maxHeight: `min(${spaceTop - padding - 20}px, 60vh)`,
+        };
+      case "bottom":
+        return {
+          ...style,
+          top: `${highlightRect.bottom + padding}px`,
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: "min(450px, calc(100vw - 40px))",
+          maxHeight: `min(${spaceBottom - padding - 20}px, 60vh)`,
+        };
+      case "left":
+        return {
+          ...style,
+          right: `${viewportWidth - highlightRect.left + padding}px`,
+          top: `${Math.max(20, Math.min(highlightRect.top, viewportHeight - 300))}px`,
+          width: `min(${spaceLeft - padding - 20}px, 450px)`,
+          maxHeight: "min(calc(100vh - 40px), 60vh)",
+        };
+      case "right":
+        return {
+          ...style,
+          left: `${highlightRect.right + padding}px`,
+          top: `${Math.max(20, Math.min(highlightRect.top, viewportHeight - 300))}px`,
+          width: `min(${spaceRight - padding - 20}px, 450px)`,
+          maxHeight: "min(calc(100vh - 40px), 60vh)",
+        };
+    }
+
+    return style;
+  };
+
+  /**
+   * Navigate to next step or close on final step
    */
   const handleNext = useCallback(() => {
     if (currentStep < totalSteps - 1) {
@@ -141,7 +308,7 @@ export default function Tutorial({
   }, [currentStep, totalSteps, onClose]);
 
   /**
-   * Go to previous step
+   * Navigate to previous step
    */
   const handlePrev = useCallback(() => {
     if (currentStep > 0) {
@@ -150,7 +317,7 @@ export default function Tutorial({
   }, [currentStep]);
 
   /**
-   * Skip tutorial
+   * Skip tutorial and close
    */
   const handleSkip = useCallback(() => {
     onClose();
@@ -158,31 +325,32 @@ export default function Tutorial({
 
   /**
    * Update highlight when step changes
+   * Includes delay to ensure DOM stability
    */
   useEffect(() => {
     if (isOpen && step) {
-      // Minimal delay for instant response
       const timer = setTimeout(() => {
         updateHighlight();
-      }, 50); // Reduced from 100ms to 50ms
+      }, 100);
       return () => clearTimeout(timer);
     }
   }, [isOpen, step, updateHighlight]);
 
   /**
-   * Update highlight on window resize or when content changes
+   * Update highlight on window resize or DOM changes
+   * Uses MutationObserver to detect layout changes
    */
   useEffect(() => {
     if (!isOpen) return;
 
     const handleResize = () => updateHighlight();
     
-    // Use MutationObserver to detect layout changes (like error banner appearing)
+    // Observer to detect DOM mutations (e.g., error banner appearing)
     const observer = new MutationObserver(() => {
       updateHighlight();
     });
 
-    // Observe changes to the body and main content area
+    // Observe body for layout changes
     observer.observe(document.body, {
       childList: true,
       subtree: true,
@@ -200,223 +368,29 @@ export default function Tutorial({
 
   /**
    * Keyboard navigation
+   * - Escape: close tutorial
+   * - ArrowRight/Enter: next step
+   * - ArrowLeft: previous step
    */
   useEffect(() => {
     if (!isOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      switch (e.key) {
-        case "Escape":
-          handleSkip();
-          break;
-        case "ArrowRight":
-        case "Enter":
-          handleNext();
-          break;
-        case "ArrowLeft":
-          handlePrev();
-          break;
+      if (e.key === "Escape") {
+        handleSkip();
+      } else if (e.key === "ArrowRight" || e.key === "Enter") {
+        handleNext();
+      } else if (e.key === "ArrowLeft") {
+        handlePrev();
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, handleNext, handlePrev, handleSkip]);
 
-  /**
-   * Prevent body scroll when tutorial is open
-   * But allow programmatic scrolling for centering elements
-   */
-  useEffect(() => {
-    if (isOpen) {
-
-
-      // Prevent user scroll but allow programmatic scroll
-      const preventScroll = (e: WheelEvent | TouchEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-      };
-
-      // Add passive: false to allow preventDefault
-      document.addEventListener("wheel", preventScroll, { passive: false });
-      document.addEventListener("touchmove", preventScroll, { passive: false });
-
-      return () => {
-        document.removeEventListener("wheel", preventScroll);
-        document.removeEventListener("touchmove", preventScroll);
-      };
-    }
-  }, [isOpen]);
-
-  // Don't render if not open or no steps
-  if (!isOpen || totalSteps === 0) {
-    return null;
-  }
-
-  /**
-   * Calculate tooltip position based on highlighted element and placement
-   * Responsive design for all screen sizes (Tailwind breakpoints)
-   * Allows overlay on highlight when space is limited
-   */
-  const getTooltipStyle = (): React.CSSProperties => {
-    if (!highlightRect) {
-      return {
-        position: "fixed",
-        top: "50%",
-        left: "50%",
-        transform: "translate(-50%, -50%)",
-      };
-    }
-
-    const viewportHeight = window.innerHeight;
-    const viewportWidth = window.innerWidth;
-    
-    // Tailwind-style breakpoints
-    const isMobile = viewportWidth < 640; // sm
-    const isTablet = viewportWidth >= 640 && viewportWidth < 1024; // sm-lg
-
-
-    const style: React.CSSProperties = {
-      position: "fixed",
-      zIndex: (zIndex || 9999) + 2,
-    };
-
-    // For very large highlighted elements (>60% of viewport height)
-    const isLargeElement = highlightRect.height > viewportHeight * 0.6;
-    
-    // On mobile, always show tooltip at bottom center (fixed position)
-    if (isMobile) {
-      style.bottom = "20px";
-      style.left = "50%";
-      style.transform = "translateX(-50%)";
-      style.width = "calc(100% - 40px)";
-      style.maxWidth = "calc(100vw - 40px)";
-      style.height = "auto";
-      style.maxHeight = "45vh"; // Fixed max height
-      return style;
-    }
-
-    // On tablet, show at bottom with more width
-    if (isTablet) {
-      style.bottom = "20px";
-      style.left = "50%";
-      style.transform = "translateX(-50%)";
-      style.width = "calc(100% - 60px)";
-      style.maxWidth = "500px";
-      style.height = "auto";
-      style.maxHeight = "50vh"; // Fixed max height
-      return style;
-    }
-
-    // Desktop: Smart positioning
-    if (isLargeElement) {
-      // For large elements, check available space
-      const spaceRight = viewportWidth - highlightRect.right;
-      const spaceBottom = viewportHeight - highlightRect.bottom;
-      
-      // If not enough space on the side, overlay on the element
-      if (spaceRight < 450 && spaceBottom < 300) {
-        // Overlay at bottom-center of viewport
-        style.bottom = "40px";
-        style.left = "50%";
-        style.transform = "translateX(-50%)";
-        style.width = "450px";
-        style.maxWidth = "calc(100vw - 80px)";
-        style.height = "auto";
-        style.maxHeight = "60vh"; // Fixed max height
-        // Add semi-transparent backdrop to make text readable
-        style.backgroundColor = "rgba(255, 255, 255, 0.98)";
-        style.backdropFilter = "blur(8px)";
-        return style;
-      }
-      
-      // Otherwise show in bottom-right corner
-      style.bottom = "40px";
-      style.right = "40px";
-      style.width = "400px";
-      style.maxWidth = "calc(100vw - 80px)";
-      style.height = "auto";
-      style.maxHeight = "60vh"; // Fixed max height
-      return style;
-    }
-
-    // Normal elements: Position relative to highlight
-    const placement = step.placement || "bottom";
-    const padding = 24;
-    const spaceTop = highlightRect.top;
-    const spaceBottom = viewportHeight - highlightRect.bottom;
-    const spaceLeft = highlightRect.left;
-    const spaceRight = viewportWidth - highlightRect.right;
-
-    // Check if there's enough space anywhere
-    const hasSpaceBottom = spaceBottom > 200;
-    const hasSpaceTop = spaceTop > 200;
-    const hasSpaceRight = spaceRight > 400;
-    const hasSpaceLeft = spaceLeft > 400;
-    
-    // If no space available, overlay on the element
-    if (!hasSpaceBottom && !hasSpaceTop && !hasSpaceRight && !hasSpaceLeft) {
-      style.top = "50%";
-      style.left = "50%";
-      style.transform = "translate(-50%, -50%)";
-      style.width = "min(450px, calc(100vw - 40px))";
-      style.maxWidth = "min(450px, calc(100vw - 40px))";
-      style.height = "auto";
-      style.maxHeight = "60vh";
-      style.backgroundColor = "rgba(255, 255, 255, 0.98)";
-      style.backdropFilter = "blur(8px)";
-      return style;
-    }
-
-    // Auto-adjust placement based on available space
-    let finalPlacement = placement;
-    
-    if (placement === "bottom" && !hasSpaceBottom) {
-      finalPlacement = hasSpaceTop ? "top" : (hasSpaceRight ? "right" : "left");
-    } else if (placement === "top" && !hasSpaceTop) {
-      finalPlacement = hasSpaceBottom ? "bottom" : (hasSpaceRight ? "right" : "left");
-    }
-
-    // Apply positioning
-    switch (finalPlacement) {
-      case "top":
-        style.bottom = `${viewportHeight - highlightRect.top + padding}px`;
-        style.left = `50%`;
-        style.transform = "translateX(-50%)";
-        style.width = "min(450px, calc(100vw - 40px))";
-        style.maxWidth = "min(450px, calc(100vw - 40px))";
-        style.height = "auto";
-        style.maxHeight = `min(${spaceTop - padding - 20}px, 60vh)`;
-        break;
-      case "bottom":
-        style.top = `${highlightRect.bottom + padding}px`;
-        style.left = `50%`;
-        style.transform = "translateX(-50%)";
-        style.width = "min(450px, calc(100vw - 40px))";
-        style.maxWidth = "min(450px, calc(100vw - 40px))";
-        style.height = "auto";
-        style.maxHeight = `min(${spaceBottom - padding - 20}px, 60vh)`;
-        break;
-      case "left":
-        style.right = `${viewportWidth - highlightRect.left + padding}px`;
-        style.top = `${Math.max(20, Math.min(highlightRect.top, viewportHeight - 300))}px`;
-        style.width = `min(${spaceLeft - padding - 20}px, 450px)`;
-        style.maxWidth = `min(${spaceLeft - padding - 20}px, 450px)`;
-        style.height = "auto";
-        style.maxHeight = "min(calc(100vh - 40px), 60vh)";
-        break;
-      case "right":
-        style.left = `${highlightRect.right + padding}px`;
-        style.top = `${Math.max(20, Math.min(highlightRect.top, viewportHeight - 300))}px`;
-        style.width = `min(${spaceRight - padding - 20}px, 450px)`;
-        style.maxWidth = `min(${spaceRight - padding - 20}px, 450px)`;
-        style.height = "auto";
-        style.maxHeight = "min(calc(100vh - 40px), 60vh)";
-        break;
-    }
-
-    return style;
-  };
+  // Don't render if not open or no step
+  if (!isOpen || !step) return null;
 
   return createPortal(
     <div
@@ -425,51 +399,31 @@ export default function Tutorial({
       style={{
         position: "fixed",
         inset: 0,
-        zIndex,
-        pointerEvents: "auto",
+        zIndex: zIndex || 9999,
+        pointerEvents: "none",
       }}
       role="dialog"
       aria-modal="true"
       aria-labelledby="tutorial-title"
+      aria-describedby="tutorial-content"
     >
-      {/* Dark overlay with cutout for highlighted element */}
-      <svg
+      {/* Dark backdrop overlay */}
+      <div
+        className="tutorial-backdrop"
         style={{
           position: "absolute",
           inset: 0,
-          width: "100%",
-          height: "100%",
-          pointerEvents: "none",
+          backgroundColor: "rgba(0, 0, 0, 0.7)",
+          transition: "opacity 0.3s ease",
+          pointerEvents: "auto",
         }}
-      >
-        <defs>
-          <mask id="tutorial-mask">
-            <rect x="0" y="0" width="100%" height="100%" fill="white" />
-            {highlightRect && (
-              <rect
-                x={highlightRect.left - 8}
-                y={highlightRect.top - 8}
-                width={highlightRect.width + 16}
-                height={highlightRect.height + 16}
-                rx="8"
-                fill="black"
-              />
-            )}
-          </mask>
-        </defs>
-        <rect
-          x="0"
-          y="0"
-          width="100%"
-          height="100%"
-          fill="rgba(0, 0, 0, 0.75)"
-          mask="url(#tutorial-mask)"
-        />
-      </svg>
+        onClick={handleSkip}
+      />
 
-      {/* Highlighted element border */}
+      {/* Spotlight highlight box around target element */}
       {highlightRect && (
         <div
+          className="tutorial-spotlight"
           style={{
             position: "absolute",
             left: highlightRect.left - 8,
@@ -485,92 +439,79 @@ export default function Tutorial({
         />
       )}
 
-      {/* Tooltip card - Always fully visible without scrolling */}
+      {/* Tooltip card with content and controls */}
       <div
+        ref={tooltipRef}
         className="tutorial-tooltip"
-        style={getTooltipStyle()}
+        style={{ ...getTooltipStyle(), pointerEvents: "auto" }}
       >
-        <div className="bg-white rounded-xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
-          <div className="p-4 sm:p-5 flex flex-col" style={{ maxHeight: "inherit" }}>
-            {/* Header - Fixed size */}
-            <div className="flex items-start justify-between mb-2 sm:mb-3 flex-shrink-0">
-              <div className="flex-1 min-w-0 pr-3">
+        <div className="bg-white rounded-xl shadow-2xl border border-slate-200 flex flex-col h-full overflow-hidden">
+          {/* Scrollable content area */}
+          <div className="flex-1 overflow-y-auto p-4 sm:p-5">
+            {/* Header section */}
+            <div className="flex items-start justify-between mb-3 gap-3">
+              <div className="flex-1 min-w-0">
                 <h3
                   id="tutorial-title"
-                  className="text-sm sm:text-base font-bold text-slate-900 mb-1 line-clamp-1"
+                  className="text-base sm:text-lg font-bold text-slate-900 mb-1"
                 >
                   {step.title}
                 </h3>
-                <div className="text-xs text-slate-500">
+                <div className="text-xs sm:text-sm text-slate-500">
                   Step {currentStep + 1} of {totalSteps}
                 </div>
               </div>
+              {/* Close button */}
               <button
                 onClick={handleSkip}
-                className="flex-shrink-0 text-slate-400 hover:text-slate-600 transition-colors -mt-1"
+                className="flex-shrink-0 text-slate-400 hover:text-slate-600 transition-colors p-1"
                 aria-label="Close tutorial"
               >
-                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
 
-            {/* Content - Flexible with strict line clamp */}
-            <div className="flex-1 min-h-0 mb-3 sm:mb-4 overflow-hidden">
-              <p className="text-xs sm:text-sm text-slate-700 leading-relaxed line-clamp-4 sm:line-clamp-5">
-                {step.content}
-              </p>
-            </div>
+            {/* Content text */}
+            <p id="tutorial-content" className="text-sm sm:text-base text-slate-700 leading-relaxed">
+              {step.content}
+            </p>
+          </div>
 
-            {/* Navigation - Compact and fixed */}
-            <div className="flex-shrink-0">
-              <div className="flex items-center justify-between gap-2 mb-2">
-                <button
-                  onClick={handleSkip}
-                  className="text-xs text-slate-600 hover:text-slate-900 font-medium transition-colors"
-                >
-                  Skip
-                </button>
+          {/* Fixed footer with navigation buttons */}
+          <div className="flex-shrink-0 border-t border-slate-200 p-3 sm:p-4 bg-slate-50">
+            <div className="flex items-center justify-between gap-3">
+              {/* Previous button */}
+              <button
+                onClick={handlePrev}
+                disabled={currentStep === 0}
+                className="px-3 sm:px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg
+                         hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                aria-label="Previous step"
+              >
+                <span className="hidden sm:inline">Previous</span>
+                <span className="sm:hidden">Prev</span>
+              </button>
+              
+              {/* Skip button */}
+              <button
+                onClick={handleSkip}
+                className="px-3 sm:px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-700 transition-colors"
+                aria-label="Skip tutorial"
+              >
+                Skip
+              </button>
 
-                <div className="flex items-center gap-1.5 sm:gap-2">
-                  {currentStep > 0 && (
-                    <button
-                      onClick={handlePrev}
-                      className="px-2.5 sm:px-3 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-md transition-colors"
-                    >
-                      Back
-                    </button>
-                  )}
-                  <button
-                    onClick={handleNext}
-                    className="px-2.5 sm:px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors"
-                  >
-                    {currentStep < totalSteps - 1 ? "Next" : "Done"}
-                  </button>
-                </div>
-              </div>
-
-              {/* Progress dots - Compact */}
-              <div className="flex justify-center gap-1 pt-2 border-t border-slate-200">
-                {steps.map((_, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setCurrentStep(index)}
-                    className={`h-1 rounded-full transition-all ${
-                      index === currentStep
-                        ? "bg-blue-600 w-4"
-                        : "bg-slate-300 hover:bg-slate-400 w-1"
-                    }`}
-                    aria-label={`Go to step ${index + 1}`}
-                  />
-                ))}
-              </div>
+              {/* Next/Finish button */}
+              <button
+                onClick={handleNext}
+                className="px-3 sm:px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg
+                         hover:bg-blue-700 transition-all shadow-sm"
+                aria-label={currentStep === totalSteps - 1 ? "Finish tutorial" : "Next step"}
+              >
+                {currentStep === totalSteps - 1 ? "Finish" : "Next"}
+              </button>
             </div>
           </div>
         </div>
@@ -579,5 +520,3 @@ export default function Tutorial({
     document.body
   );
 }
-
-

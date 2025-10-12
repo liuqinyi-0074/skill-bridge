@@ -1,14 +1,13 @@
 // src/pages/Profile.tsx
-// Page: Profile
-// - View Tutorial stays in the page header top-right (original position)
-// - “Export PDF” button stays near Career Intent on the right, below the top edge
-// - SkillRoadMap shows ONLY abilities from `selectedJobUnmatched`
-// - Auto-fetches training advice on target job change and persists to Redux
-// - Converts between Redux format ({ code, title }) and UI format ({ id, title })
-// - Accessible UI with clear headings and controls
+// Profile page with tutorial matching Insight page style
+// - Tutorial button in top-right corner
+// - Export PDF button hidden on mobile
+// - Shows skill roadmap from unmatched abilities
+// - Auto-fetches training advice
+// - VET glossary search for terminology lookup
 
 import React, { useEffect, useMemo, useRef, useState } from "react"
-import {useLocation } from "react-router-dom"
+import { useLocation } from "react-router-dom"
 import { useSelector } from "react-redux"
 import type { RootState } from "../store"
 import { useAppDispatch } from "../store/hooks"
@@ -22,7 +21,7 @@ import CareerChoicePanel, {
 import SkillRoadMap, { type SkillRoadmapItem } from "../components/profile/SkillRoadMap"
 import TrainingAdviceList, { type TrainingAdvice } from "../components/profile/TrainingAdviceList"
 import VetGlossarySearch from "../components/profile/VetGlossarySearch"
-import TutorialLauncher from "../components/tutorial/TutorialLauncher"
+import Tutorial from "../components/tutorial/Tutorial"
 
 // Redux actions + types
 import {
@@ -49,7 +48,7 @@ import { useTrainingAdvice } from "../hooks/queries/useTrainingAdvice"
 import { getProfileTutorialSteps } from "../data/ProfileTutorialSteps"
 import type { AnalyzerRouteState } from "../types/routes"
 import type { AnzscoOccupation } from "../types/domain"
-import type { TrainingAdviceRes, VetCourse, TrainingCourse } from "../types/training"
+import type { TrainingAdviceRes, TrainingCourse } from "../types/training"
 
 // Utils
 import { exportElementToPdf } from "../lib/utils/pdf"
@@ -74,13 +73,17 @@ const REGION_OPTIONS = [
 type SelectedJobValue = Exclude<SelectedJob, null>
 
 // ============================================================================
-// Helpers
+// Helper Functions
 // ============================================================================
+
+/** Generate fallback URL for a course code */
 const fallbackCourseUrl = (code: string): string =>
   `https://training.gov.au/training/details/${encodeURIComponent(code)}`
 
+/** Safe string normalization */
 const normName = (v: unknown): string => (typeof v === "string" ? v : "")
 
+/** Normalize roles array with deduplication */
 const normalizeRoles = (roles: Array<RoleLite | string> | null | undefined): RoleLite[] => {
   if (!Array.isArray(roles)) return []
   const seen = new Set<string>()
@@ -96,6 +99,7 @@ const normalizeRoles = (roles: Array<RoleLite | string> | null | undefined): Rol
   return out
 }
 
+/** Normalize selected job */
 const normalizeSelectedJob = (
   job: SelectedJob | string | null | undefined
 ): SelectedJobValue | null => {
@@ -110,6 +114,7 @@ const normalizeSelectedJob = (
   return { code, title: job.title || code }
 }
 
+/** Generate unique key for ability */
 const abilityKey = (a: AbilityLite): string | null => {
   const name = normName((a as { name?: unknown }).name)
   const code =
@@ -118,6 +123,7 @@ const abilityKey = (a: AbilityLite): string | null => {
   return `${a.aType}:${code || name.toLowerCase()}`
 }
 
+/** Generate unique key for roadmap item */
 const roadmapKey = (it: SkillRoadmapItem): string | null => {
   const name = normName((it as { skill?: unknown }).skill)
   const code =
@@ -126,6 +132,7 @@ const roadmapKey = (it: SkillRoadmapItem): string | null => {
   return `${it.abilityType}:${code || name.toLowerCase()}`
 }
 
+/** Generate identity key for ability */
 const abilityIdentityKey = (ability: AbilityLite): string => {
   const name = normName(ability.name)
   const base = ability.code ?? name
@@ -133,6 +140,7 @@ const abilityIdentityKey = (ability: AbilityLite): string => {
   return `${ability.aType}:${safe}`
 }
 
+/** Remove duplicate abilities */
 const uniqueAbilities = (abilities: AbilityLite[]): AbilityLite[] => {
   const seen = new Set<string>()
   const result: AbilityLite[] = []
@@ -148,6 +156,7 @@ const uniqueAbilities = (abilities: AbilityLite[]): AbilityLite[] => {
   return result
 }
 
+/** Collapse unmatched buckets into flat ability array */
 const collapseUnmatchedBuckets = (b: UnmatchedBuckets | null | undefined): AbilityLite[] => {
   if (!b) return []
   const extract = (entry: unknown): { name: string; code?: string } | null => {
@@ -182,6 +191,7 @@ const collapseUnmatchedBuckets = (b: UnmatchedBuckets | null | undefined): Abili
   ]
 }
 
+/** Convert abilities to skill roadmap items */
 const toSkillRoadmapItems = (abilities: AbilityLite[]): SkillRoadmapItem[] =>
   abilities.map((ability, index) => ({
     id: `${abilityIdentityKey(ability)}:${index}`,
@@ -189,57 +199,39 @@ const toSkillRoadmapItems = (abilities: AbilityLite[]): SkillRoadmapItem[] =>
     category: ability.aType,
     skill: normName(ability.name),
     code: typeof ability.code === "string" ? ability.code : undefined,
-    startDate: undefined,
-    endDate: undefined,
   }))
 
+/** Deduplicate roadmap items */
 const dedupeRoadmapItems = (items: SkillRoadmapItem[]): SkillRoadmapItem[] => {
   const seen = new Set<string>()
-  const out: SkillRoadmapItem[] = []
+  const result: SkillRoadmapItem[] = []
   for (const it of items) {
     const k = roadmapKey(it)
     if (!k) continue
     if (!seen.has(k)) {
       seen.add(k)
-      out.push(it)
+      result.push(it)
     }
   }
-  return out
+  return result
 }
 
-function mapAdviceResToState(
-  res: TrainingAdviceRes,
-  fallbackOcc: { code: string; title: string }
-): TrainingAdviceState {
-  const occ = {
-    code: res?.anzsco?.code ?? fallbackOcc.code,
-    title: res?.anzsco?.title ?? fallbackOcc.title,
-  }
-  const list: VetCourse[] = Array.isArray(res?.vet_courses) ? res.vet_courses : []
-  const courses: TrainingCourse[] = list
-    .map((c) => ({
-      id: (c.vet_course_code ?? "").trim(),
-      name: (c.course_name ?? "").trim(),
-      url: fallbackCourseUrl(c.vet_course_code ?? ""),
-    }))
-    .filter((c) => c.id && c.name)
-  return { occupation: occ, courses }
+/** Map training API response to Redux state */
+const mapAdviceResToState = (
+  res: TrainingAdviceRes | null | undefined,
+  fallbackOccupation: { code: string; title: string }
+): TrainingAdviceState => {
+  const occupation = res?.anzsco ?? fallbackOccupation
+  const rawCourses = res?.vet_courses ?? []
+  const courses: TrainingCourse[] = rawCourses.map((c) => ({
+    id: c.vet_course_code,
+    name: c.course_name || c.vet_course_code,
+  }))
+  return { occupation, courses }
 }
 
-// ============================================================================
-// SelectQuestion (modal)
-// ============================================================================
-type SelectQuestionProps = {
-  title: string
-  open: boolean
-  options: string[]
-  value: string | null
-  onClose: () => void
-  onSave: (value: string) => void
-  helperText?: string
-}
-
-const SelectQuestion: React.FC<SelectQuestionProps> = ({
+/** SelectQuestion component for region selection */
+function SelectQuestion({
   title,
   open,
   options,
@@ -247,37 +239,35 @@ const SelectQuestion: React.FC<SelectQuestionProps> = ({
   onClose,
   onSave,
   helperText,
-}) => {
-  const [selected, setSelected] = useState(value)
+}: {
+  title: string
+  open: boolean
+  options: string[]
+  value: string | null
+  onClose: () => void
+  onSave: (value: string) => void
+  helperText?: string
+}): React.ReactElement | null {
+  const [selected, setSelected] = useState<string | null>(value)
+
   useEffect(() => {
-    if (open) setSelected(value)
-  }, [open, value])
+    setSelected(value)
+  }, [value])
+
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-      <div className="w-full max-w-md space-y-4 rounded-xl bg-white p-6 shadow-modal">
-        <div className="flex items-center justify-between">
-          <h3 className="text-xl font-heading font-bold text-ink">{title}</h3>
-          <button
-            onClick={onClose}
-            className="rounded-lg p-1 transition hover:bg-gray-100"
-            aria-label="Close"
-          >
-            <svg className="h-5 w-5 text-ink-soft" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-md space-y-4 rounded-xl border border-border bg-white p-6 shadow-2xl">
+        <h3 className="text-lg font-bold text-ink">{title}</h3>
         {helperText && <p className="text-sm text-ink-soft">{helperText}</p>}
 
-        <div className="max-h-[400px] space-y-2 overflow-y-auto">
+        <div className="grid max-h-80 gap-2 overflow-y-auto">
           {options.map((opt) => (
             <button
               key={opt}
               onClick={() => setSelected(opt)}
-              className="w-full rounded-lg border px-4 py-2 text-left transition"
+              className="rounded-lg border px-3 py-2 text-left text-sm font-medium transition"
               style={{
                 borderColor: selected === opt ? "#5E75A4" : "#e2e8f0",
                 backgroundColor: selected === opt ? "#5E75A4" : "white",
@@ -312,21 +302,25 @@ const SelectQuestion: React.FC<SelectQuestionProps> = ({
 }
 
 // ============================================================================
-// Main
+// Main Component
 // ============================================================================
 export default function Profile(): React.ReactElement {
   const dispatch = useAppDispatch()
   const { state } = useLocation()
   const routeState = (state as (AnalyzerRouteState & { notice?: string }) | undefined) ?? undefined
 
-  // Root container for PDF export
+  // Refs
   const exportRef = useRef<HTMLDivElement | null>(null)
+  const vetTerminologyRef = useRef<HTMLDivElement>(null)
 
-  // Redux source
+  // Tutorial state
+  const [showTutorial, setShowTutorial] = useState(false)
+
+  // Redux state
   const analyzer = useSelector((s: RootState) => s.analyzer)
   const notice = routeState?.notice
 
-  // One-time hydration from route state
+  // Hydrate from route state (one-time)
   useEffect(() => {
     if (!routeState) return
     if (!analyzer.chosenRoles?.length && routeState.roles?.length) {
@@ -352,7 +346,7 @@ export default function Profile(): React.ReactElement {
       dispatch(setTrainingAdvice(routeState.training))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // once
+  }, [])
 
   // Career choice value
   const careerChoiceValue = useMemo((): CareerChoiceState => {
@@ -371,7 +365,7 @@ export default function Profile(): React.ReactElement {
     return { pastJobs, targetJob, region: regionRedux || regionRoute }
   }, [analyzer, routeState])
 
-  // Persist panel changes
+  // Handle career choice changes
   const onCareerChoiceChange = (next: CareerChoiceState): void => {
     dispatch(setChosenRoles(normalizeRoles(next.pastJobs)))
     const targetJobForRedux = next.targetJob ? { code: next.targetJob.id, title: next.targetJob.title } : null
@@ -404,7 +398,7 @@ export default function Profile(): React.ReactElement {
     }))
   }, [analyzer.trainingAdvice])
 
-  // Search block
+  // Occupation search
   const [industryCode, setIndustryCode] = useState("")
   const [keyword, setKeyword] = useState("")
   const [searchParams, setSearchParams] = useState<SearchParams>(null)
@@ -432,7 +426,7 @@ export default function Profile(): React.ReactElement {
     noResults: !isFetching && normalizedResults.length === 0,
   }
 
-  // Unmatched-only abilities -> roadmap
+  // Skill roadmap from unmatched
   const unmatchedRedux = analyzer.selectedJobUnmatched
   const unmatchedRoute = routeState?.unmatched ?? null
   const abilitiesFromUnmatched = useMemo(() => {
@@ -446,10 +440,7 @@ export default function Profile(): React.ReactElement {
     return { key, items }
   }, [abilitiesFromUnmatched])
 
-  // Glossary scroll anchor
-  const vetTerminologyRef = useRef<HTMLDivElement>(null)
-
-  // Export whole page
+  // Export PDF
   const onExportPdf = async (): Promise<void> => {
     if (!exportRef.current) return
     const code = analyzer.selectedJob?.code ? `_${analyzer.selectedJob.code}` : ""
@@ -458,18 +449,27 @@ export default function Profile(): React.ReactElement {
   }
 
   return (
-    // Whole page container for PDF export
     <div id="profile-export-root" ref={exportRef}>
-      {/* Header with centered title and top-right tutorial (original position) */}
+      {/* Header with tutorial button (matching Insight page style) */}
       <div id="profile-header" className="relative bg-white px-4 py-12 sm:px-6 lg:px-8">
-        {/* View Tutorial pinned to header top-right */}
-        <div className="absolute right-4 top-4 sm:right-8 sm:top-6">
-          <TutorialLauncher
-            steps={() => getProfileTutorialSteps()}
-            placement="top-right"
-            label="View Tutorial"
-            variant="outline"
-          />
+        {/* Tutorial button - top right corner */}
+        <div className="absolute top-4 right-4 sm:top-6 sm:right-8">
+          <button
+            onClick={() => setShowTutorial(true)}
+            className="inline-flex items-center gap-2 px-5 py-3 bg-white text-primary border-2 border-primary text-sm font-semibold rounded-full shadow-lg hover:bg-primary hover:text-white transition-all duration-200"
+            aria-label="View Tutorial"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+            <span className="hidden sm:inline">View Tutorial</span>
+            <span className="sm:hidden">Tutorial</span>
+          </button>
         </div>
 
         <div className="mx-auto max-w-7xl text-center">
@@ -511,8 +511,8 @@ export default function Profile(): React.ReactElement {
       <div className="mx-auto max-w-7xl space-y-8 px-4 py-12 sm:px-6 lg:px-8">
         {/* Career Intent Section */}
         <section id="career-intent" className="relative">
-          {/* Export PDF near Career Intent, below top edge, right aligned */}
-          <div className="absolute right-0 -top-6 sm:-top-8">
+          {/* Export PDF button - hidden on mobile */}
+          <div className="absolute right-0 -top-6 sm:-top-8 hidden sm:block">
             <button
               onClick={onExportPdf}
               className="inline-flex items-center gap-2 rounded-full border-2 border-primary bg-white px-4 py-2 text-sm font-semibold text-primary shadow-lg transition-all hover:bg-primary hover:text-white"
@@ -605,10 +605,12 @@ export default function Profile(): React.ReactElement {
                       <strong>Confused by course terminology?</strong> Try our VET Terminology Dictionary below.
                     </p>
                     <button
-                      onClick={() => document.getElementById("vet-terminology")?.scrollIntoView({ behavior: "smooth" })}
-                      className="text-sm font-semibold text-blue-700 underline transition hover:text-blue-800"
+                      onClick={() =>
+                        vetTerminologyRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+                      }
+                      className="text-sm font-semibold text-blue-700 underline hover:text-blue-800"
                     >
-                      Go to VET Terminology →
+                      Jump to VET Glossary
                     </button>
                   </div>
                 </div>
@@ -617,12 +619,27 @@ export default function Profile(): React.ReactElement {
           </div>
         </section>
 
-        {/* VET Terminology Section */}
+        {/* VET Glossary Section */}
         <section id="vet-terminology" ref={vetTerminologyRef}>
-          <h2 className="mb-4 text-2xl font-heading font-bold text-ink">VET Terminology</h2>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-2xl font-heading font-bold text-ink">VET Terminology</h2>
+            <HelpToggleSmall
+              placement="left"
+              openOn="both"
+              text="Search for any VET term or acronym to see its definition and related terms."
+            />
+          </div>
+
           <VetGlossarySearch />
         </section>
       </div>
+
+      {/* Tutorial overlay */}
+      <Tutorial
+        steps={getProfileTutorialSteps()}
+        isOpen={showTutorial}
+        onClose={() => setShowTutorial(false)}
+      />
     </div>
   )
 }

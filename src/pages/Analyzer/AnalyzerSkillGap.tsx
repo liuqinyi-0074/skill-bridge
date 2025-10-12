@@ -1,9 +1,8 @@
 // src/pages/Analyzer/AnalyzerSkillGap.tsx
-// Complete implementation with navigation fix and NO category
-// - Reads unmatched from Redux; if missing, falls back to route state ONLY
-// - Does not write back to Redux
-// - Allows exporting only the printable region to PDF
-// - FIXED: Now passes complete state to next step
+// Skill Gap analysis page for the Analyzer workflow
+// Displays skills user is missing for their target occupation
+// Export PDF button hidden on mobile devices
+// All English comments
 
 import React, { useMemo, useRef } from "react";
 import { useSelector } from "react-redux";
@@ -25,10 +24,16 @@ import type { AnalyzerRouteState } from "../../types/routes";
  * 
  * Features:
  * - Shows missing Knowledge, Tech Skills, and General Skills
- * - Exports skill gap report to PDF
+ * - Exports skill gap report to PDF (hidden on mobile)
  * - Reads from Redux or route state as fallback
  * - Passes complete state to next step (Training)
- * - NO CATEGORY - API doesn't return it
+ * - Handles empty states and errors gracefully
+ * 
+ * Data Flow:
+ * 1. Read unmatched abilities from Redux store
+ * 2. Fallback to route state if Redux is empty
+ * 3. Process and display as SkillItem array
+ * 4. Pass all data to next step on navigation
  */
 export default function AnalyzerSkillGap(): React.ReactElement {
   const { goPrev, goNext } = useStepNav();
@@ -46,7 +51,9 @@ export default function AnalyzerSkillGap(): React.ReactElement {
 
   /**
    * Build complete navigation state to pass to next step
-   * This ensures all data is preserved through the navigation chain
+   * Ensures all data is preserved through the navigation chain
+   * 
+   * @returns Complete analyzer state for route navigation
    */
   const buildNavigationState = (): AnalyzerRouteState => ({
     roles: store.chosenRoles,
@@ -54,13 +61,16 @@ export default function AnalyzerSkillGap(): React.ReactElement {
     industries: store.interestedIndustryCodes ?? [],
     region: store.preferredRegion ?? "",
     selectedJob: store.selectedJob,
-    unmatched: unmatched, // KEY FIX: Pass unmatched to next step
+    unmatched: unmatched, // Critical: Pass unmatched to next step
     training: store.trainingAdvice,
   });
 
   /**
-   * Collect names from a bucket that may contain strings or objects
-   * with common name fields (name, title, label, code)
+   * Collect skill names from a bucket that may contain strings or objects
+   * Handles various object property names (name, title, label, code)
+   * 
+   * @param bucket - Array of strings or objects with skill information
+   * @returns Array of skill name strings
    */
   const collect = (bucket: unknown): string[] => {
     if (!Array.isArray(bucket)) return [];
@@ -70,7 +80,7 @@ export default function AnalyzerSkillGap(): React.ReactElement {
         // Handle string items directly
         if (typeof item === "string") return item.trim();
         
-        // Handle object items with various property names
+        // Handle object items with common property names
         if (item && typeof item === "object") {
           const obj = item as { 
             name?: unknown; 
@@ -79,6 +89,7 @@ export default function AnalyzerSkillGap(): React.ReactElement {
             label?: unknown 
           };
           
+          // Try each common property in order of preference
           const candidate =
             (typeof obj.name === "string" && obj.name) ||
             (typeof obj.title === "string" && obj.title) ||
@@ -116,26 +127,25 @@ export default function AnalyzerSkillGap(): React.ReactElement {
     // Collect Tech Skills items
     const tech = collect(unmatched.tech);
     for (const t of tech) {
-      out.push({ name: t, status: "Missing"});
+      out.push({ name: t, status: "Missing" });
     }
 
     // Collect General Skills items
     const skill = collect(unmatched.skill);
     for (const s of skill) {
-      out.push({ name: s, status: "Missing"});
+      out.push({ name: s, status: "Missing" });
     }
 
     return out;
   }, [unmatched]);
 
-  // Determine if we have missing skills
+  // Determine UI states
   const hasMissing = Boolean(missingItems && missingItems.length > 0);
-  
-  // Determine if we have a data error (unmatched is null)
   const hasDataError = missingItems === undefined;
 
   /**
    * Export the skill gap report to PDF
+   * Uses html-to-image and jspdf libraries (loaded on demand)
    */
   const handleExport = async () => {
     if (!printAreaRef.current) return;
@@ -147,6 +157,7 @@ export default function AnalyzerSkillGap(): React.ReactElement {
       );
     } catch (error) {
       console.error("Failed to export PDF:", error);
+      // Could show a toast notification here
     }
   };
 
@@ -170,7 +181,7 @@ export default function AnalyzerSkillGap(): React.ReactElement {
         ],
       }}
     >
-      {/* Export button (top-right) */}
+      {/* Export button - hidden on mobile (< sm breakpoint) */}
       <div className="mb-6 flex justify-end">
         <Button
           variant="ghost"
@@ -178,6 +189,7 @@ export default function AnalyzerSkillGap(): React.ReactElement {
           onClick={handleExport}
           disabled={!hasMissing}
           aria-label="Export skill gap report to PDF"
+          className="hidden sm:inline-flex" // Hidden on mobile, visible on desktop
         >
           <svg
             className="w-4 h-4 mr-2"
@@ -228,7 +240,7 @@ export default function AnalyzerSkillGap(): React.ReactElement {
               </svg>
               <div>
                 <h3 className="font-semibold text-lg mb-1">
-                  Congratulations!
+                  Congratulations! 🎉
                 </h3>
                 <p>
                   You already meet all the key requirements for this occupation. 
@@ -251,7 +263,7 @@ export default function AnalyzerSkillGap(): React.ReactElement {
           Back
         </Button>
         
-        {/* FIXED: Now passes complete state including unmatched */}
+        {/* Pass complete state to next step including unmatched data */}
         <Button 
           variant="primary" 
           size="md" 

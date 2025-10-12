@@ -1,68 +1,105 @@
 // src/components/tutorial/TutorialLauncher.tsx
-// Reusable tutorial launcher component with built-in button and modal.
-// Works across pages. No `any`. Fully typed and accessible.
+// Reusable tutorial launcher component with built-in button and modal
+// Mobile optimized: shows icon-only button on small screens
+// Desktop: shows full button with text
+// Works across all pages with consistent styling
 
 import React, { useMemo, useState } from "react"
 import Tutorial from "./Tutorial"
 import type { TutorialStep } from "./Tutorial"
 
+/**
+ * Button placement options
+ * - Absolute positions: places button absolutely in corners
+ * - inline: renders button in normal document flow
+ */
 type Placement = "top-right" | "top-left" | "bottom-right" | "bottom-left" | "inline"
 
+/**
+ * Props for TutorialLauncher component
+ */
 type Props = {
-  /** Provide tutorial steps or a factory that returns steps */
+  /** Tutorial steps array or factory function that returns steps */
   steps: TutorialStep[] | (() => TutorialStep[])
-  /** Visible button label */
+  /** Button text label (hidden on mobile, shown on desktop) */
   label?: string
   /** Accessible label for screen readers */
   ariaLabel?: string
-  /** Button placement. `inline` renders in normal flow; others use absolute positioning */
+  /** Button placement strategy */
   placement?: Placement
-  /** Optional extra class on the button wrapper (useful for fine-grained layout) */
+  /** Optional extra CSS class for the wrapper */
   className?: string
-  /** Outline or filled look */
+  /** Button visual style variant */
   variant?: "outline" | "filled"
-  /** Optional leading icon; if not provided, a default info icon is used */
+  /** Optional custom icon (defaults to info icon) */
   icon?: React.ReactNode
 }
 
-/** Map placement to positioning classes */
+/**
+ * Map placement to Tailwind positioning classes
+ */
 const placementClass: Record<Exclude<Placement, "inline">, string> = {
-  "top-right": "absolute top-4 right-4 sm:top-6 sm:right-6",
-  "top-left": "absolute top-4 left-4 sm:top-6 sm:left-6",
-  "bottom-right": "absolute bottom-4 right-4 sm:bottom-6 sm:right-6",
-  "bottom-left": "absolute bottom-4 left-4 sm:bottom-6 sm:left-6",
+  "top-right": "absolute top-4 right-4 sm:top-6 sm:right-8",
+  "top-left": "absolute top-4 left-4 sm:top-6 sm:left-8",
+  "bottom-right": "absolute bottom-4 right-4 sm:bottom-6 sm:right-8",
+  "bottom-left": "absolute bottom-4 left-4 sm:bottom-6 sm:left-8",
 }
 
-/** Default info icon (stroke) */
+/**
+ * Default info/help icon component (SVG)
+ * Used when no custom icon is provided
+ */
 function InfoIcon(): React.ReactElement {
   return (
     <svg
-      className="h-5 w-5"
+      className="w-5 h-5"
       viewBox="0 0 24 24"
       fill="none"
-      role="img"
+      stroke="currentColor"
       aria-hidden="true"
     >
       <path
-        d="M12 8.5h.01M12 17v-6"
-        stroke="currentColor"
-        strokeWidth={2}
         strokeLinecap="round"
         strokeLinejoin="round"
+        strokeWidth={2}
+        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
       />
-      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth={2} />
     </svg>
   )
 }
 
-/** Button styles for two variants */
-const baseBtn =
-  "inline-flex items-center gap-2 rounded-full text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/30"
-const outlineBtn =
-  "border-2 border-primary bg-white text-primary hover:bg-primary hover:text-white shadow-md px-5 py-3"
-const filledBtn =
-  "bg-primary text-white hover:bg-primary/90 shadow-md px-5 py-3"
-
+/**
+ * TutorialLauncher Component
+ * 
+ * Renders a button that launches the tutorial overlay when clicked.
+ * Automatically adjusts for mobile (icon-only) and desktop (icon + text).
+ * 
+ * Features:
+ * - Mobile: Circular icon-only button for minimal footprint
+ * - Desktop: Full button with icon and text
+ * - Flexible placement (absolute positioning or inline)
+ * - Two style variants (outline/filled)
+ * - Fully accessible with ARIA labels
+ * - Manages tutorial open/close state internally
+ * 
+ * @example
+ * ```tsx
+ * // Top-right corner with outline style
+ * <TutorialLauncher
+ *   steps={getProfileTutorialSteps()}
+ *   placement="top-right"
+ *   label="View Tutorial"
+ *   variant="outline"
+ * />
+ * 
+ * // Inline with filled style
+ * <TutorialLauncher
+ *   steps={tutorialSteps}
+ *   placement="inline"
+ *   variant="filled"
+ * />
+ * ```
+ */
 export default function TutorialLauncher({
   steps,
   label = "View Tutorial",
@@ -72,42 +109,64 @@ export default function TutorialLauncher({
   variant = "outline",
   icon,
 }: Props): React.ReactElement {
-  // Local open/close state
+  // Internal state for tutorial open/close
   const [open, setOpen] = useState(false)
 
-  // Normalize steps input to an array and memoize
+  // Normalize steps input (handle both array and factory function)
   const resolvedSteps: TutorialStep[] = useMemo(
     () => (typeof steps === "function" ? steps() : steps),
     [steps]
   )
 
-  // Decide wrapper positioning
+  // Determine wrapper positioning class
   const wrapperClass =
     placement === "inline"
       ? className
       : `${placementClass[placement as Exclude<Placement, "inline">]} ${className}`
 
-  // Compose button styles
-  const variantClass = variant === "filled" ? filledBtn : outlineBtn
+  // Get the icon to display (custom or default)
+  const displayIcon = icon ?? <InfoIcon />
 
   return (
     <>
-      {/* Launcher button */}
+      {/* Launcher button wrapper */}
       <div className={wrapperClass}>
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className={`${baseBtn} ${variantClass}`}
           aria-label={ariaLabel}
+          className={
+            variant === "outline"
+              ? // Outline variant styling
+                "inline-flex items-center gap-2 rounded-full text-sm font-semibold transition-all duration-200 " +
+                "border-2 border-primary bg-white text-primary shadow-lg " +
+                "hover:bg-primary hover:text-white " +
+                "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/30 " +
+                // Mobile: icon-only circular button (40px)
+                "w-10 h-10 justify-center sm:w-auto sm:h-auto sm:px-5 sm:py-3 sm:justify-start"
+              : // Filled variant styling
+                "inline-flex items-center gap-2 rounded-full text-sm font-semibold transition-all duration-200 " +
+                "bg-primary text-white shadow-lg " +
+                "hover:bg-primary/90 " +
+                "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/30 " +
+                // Mobile: icon-only circular button (40px)
+                "w-10 h-10 justify-center sm:w-auto sm:h-auto sm:px-5 sm:py-3 sm:justify-start"
+          }
         >
-          {icon ?? <InfoIcon />}
+          {/* Icon - always visible */}
+          {displayIcon}
+          
+          {/* Text label - hidden on mobile, visible on desktop */}
           <span className="hidden sm:inline">{label}</span>
-          <span className="sm:hidden">Tutorial</span>
         </button>
       </div>
 
       {/* Tutorial modal overlay */}
-      <Tutorial steps={resolvedSteps} isOpen={open} onClose={() => setOpen(false)} />
+      <Tutorial
+        steps={resolvedSteps}
+        isOpen={open}
+        onClose={() => setOpen(false)}
+      />
     </>
   )
 }

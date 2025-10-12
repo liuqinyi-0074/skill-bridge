@@ -1,6 +1,9 @@
-// frontend/src/pages/Insight.tsx
-// Clean, typed, and accessible. No `any`, no dev logs.
-// Adds explicit section IDs to match `insightTutorialSteps` targets.
+// src/pages/Insight.tsx
+// Career Insights page with comprehensive data visualization
+// - Tutorial button only shows when occupation is selected
+// - Mobile-optimized tutorial launcher (icon-only on small screens)
+// - Shows geographic distribution, growth statistics, and comparisons
+// - All English comments
 
 import { useMemo, useState } from "react"
 import { useSelector } from "react-redux"
@@ -16,7 +19,7 @@ import OccupationGrowthStats from "../components/insight/OccupationGrowthCard"
 import GrowthComparisonChart from "../components/insight/GrowthComparisonChart"
 import HelpToggleSmall from "../components/ui/HelpToggleSmall"
 import ErrorBoundary from "../components/common/ErrorBoundary"
-import Tutorial from "../components/tutorial/Tutorial"
+import TutorialLauncher from "../components/tutorial/TutorialLauncher"
 import { insightTutorialSteps } from "../data/InsightTutorialStep"
 import InsightImage from "../assets/image/data.svg"
 
@@ -33,16 +36,27 @@ import {
   initializeStateValues,
 } from "../types/state"
 
-// ---------- Redux + utils ----------
+// ============================================================================
+// Redux & Utils
+// ============================================================================
 
-/** Read the currently selected ANZSCO code from Redux */
+/**
+ * Read the currently selected ANZSCO code from Redux
+ * Returns empty string if no occupation is selected
+ */
 const useTargetAnzsco = () =>
   useSelector((s: RootState) => s.analyzer?.selectedJob?.code?.trim() ?? "")
 
-/** Extract the 4-digit major group code from ANZSCO */
+/**
+ * Extract the 4-digit major group code from ANZSCO
+ * Used for career growth API queries
+ */
 const getMajorGroupCode = (code: string) => code.trim().slice(0, 4)
 
-/** Safe number parser with fallback to 0 */
+/**
+ * Safe number parser with fallback to 0
+ * Handles both number and string inputs
+ */
 const safeNumber = (v: unknown): number => {
   if (typeof v === "number" && Number.isFinite(v)) return v
   if (typeof v === "string") {
@@ -52,20 +66,28 @@ const safeNumber = (v: unknown): number => {
   return 0
 }
 
-/** Safe string parser with fallback to empty string */
+/**
+ * Safe string parser with fallback to empty string
+ */
 const safeString = (v: unknown): string => (typeof v === "string" ? v : "")
 
-/** Convert shortage API into map-friendly state→value dictionary */
+/**
+ * Convert shortage API response into map-friendly state→value dictionary
+ * Handles both array and object formats from the API
+ */
 function toEmploymentValues(res?: ShortageRes): Record<StateCode, number> {
   const out = initializeStateValues(0)
   if (!res) return out
 
+  // Handle array format: latest_by_state
   if (Array.isArray(res.latest_by_state)) {
     for (const row of res.latest_by_state) {
       const code = getStateCode(row.state)
       if (code) out[code] = safeNumber(row.nsc_emp)
     }
-  } else if (res.shortage && typeof res.shortage === "object") {
+  } 
+  // Handle object format: shortage
+  else if (res.shortage && typeof res.shortage === "object") {
     for (const [name, val] of Object.entries(res.shortage)) {
       const code = getStateCode(name)
       if (code) out[code] = safeNumber(val)
@@ -74,13 +96,20 @@ function toEmploymentValues(res?: ShortageRes): Record<StateCode, number> {
   return out
 }
 
-/** True if at least one state has data > 0 */
+/**
+ * Check if at least one state has data > 0
+ */
 const hasAnyData = (values: Record<StateCode, number>) =>
   Object.values(values).some((v) => v > 0)
 
-// ---------- UI helpers ----------
+// ============================================================================
+// UI Components
+// ============================================================================
 
-/** Section header with decorative square and inline help */
+/**
+ * Section header with decorative square and help tooltip
+ * Used for major sections throughout the page
+ */
 function SectionHeader({
   title,
   helpContent,
@@ -92,7 +121,7 @@ function SectionHeader({
 }) {
   return (
     <div className="mb-4 flex items-center gap-3">
-      {/* Decorative square; hidden from screen readers */}
+      {/* Decorative square - hidden from screen readers */}
       <div
         aria-hidden="true"
         className="h-9 w-9 rounded-lg bg-primary/15 ring-1 ring-primary/30 sm:h-10 sm:w-10"
@@ -107,31 +136,10 @@ function SectionHeader({
   )
 }
 
-/** Top-right tutorial button with accessible labeling */
-function TopRightTutorialButton({ onClick }: { onClick: () => void }): React.ReactElement {
-  return (
-    <div className="absolute top-4 right-4 sm:top-6 sm:right-8">
-      <button
-        onClick={onClick}
-        className="inline-flex items-center gap-2 px-5 py-3 bg-white text-primary border-2 border-primary text-sm font-semibold rounded-full shadow-lg hover:bg-primary hover:text-white transition-all duration-200"
-        aria-label="View Tutorial"
-      >
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
-        </svg>
-        <span className="hidden sm:inline">View Tutorial</span>
-        <span className="sm:hidden">Tutorial</span>
-      </button>
-    </div>
-  )
-}
-
-/** Loading skeleton for first screen paint */
+/**
+ * Loading skeleton component
+ * Shows animated placeholders while data is being fetched
+ */
 function LoadingSkeleton() {
   return (
     <div className="animate-pulse space-y-8" aria-busy="true" aria-live="polite">
@@ -142,11 +150,15 @@ function LoadingSkeleton() {
   )
 }
 
-/** Empty-state hero when no occupation is selected */
+/**
+ * Empty state component
+ * Displayed when no occupation is selected
+ * Shows helpful message and action buttons
+ */
 function NoOccupationSelected() {
   return (
     <>
-      {/* ID matches tutorial step "welcome" target */}
+      {/* Hero section without tutorial button */}
       <div id="hero-section" className="relative">
         <HeroIntro
           title="Your Personalized Career Insights"
@@ -155,22 +167,25 @@ function NoOccupationSelected() {
           tone="blue"
           imageDecorative
         />
-        <TopRightTutorialButton onClick={() => { /* handled in page where mounted */ }} />
       </div>
 
+      {/* Empty state message with action buttons */}
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
         <div className="rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-12 text-center">
           <h3 className="mb-2 text-xl font-semibold text-slate-900">No Occupation Selected</h3>
           <p className="mx-auto mb-6 max-w-md text-slate-600">
-            Choose a target occupation in your profile or complete the analyzer test.
+            Choose a target occupation in your profile or complete the analyzer test to see personalized career insights.
           </p>
           <div className="flex flex-col justify-center gap-3 sm:flex-row">
-            <Link to="/profile" className="rounded-lg bg-primary px-6 py-3 text-white hover:bg-primary-dark">
+            <Link 
+              to="/profile" 
+              className="rounded-lg bg-primary px-6 py-3 text-white hover:bg-primary-dark transition-colors"
+            >
               Go to Profile
             </Link>
             <Link
               to="/analyzer"
-              className="rounded-lg border border-primary bg-white px-6 py-3 text-primary hover:bg-blue-50"
+              className="rounded-lg border border-primary bg-white px-6 py-3 text-primary hover:bg-blue-50 transition-colors"
             >
               Take Analyzer Test
             </Link>
@@ -181,30 +196,48 @@ function NoOccupationSelected() {
   )
 }
 
-// ---------- Main page ----------
+// ============================================================================
+// Main Page Component
+// ============================================================================
 
+/**
+ * InsightInner - Main content component
+ * Handles data fetching, state management, and rendering
+ */
 function InsightInner(): React.ReactElement {
+  // Get selected occupation code from Redux
   const anzscoCode = useTargetAnzsco()
   const majorGroup = anzscoCode ? getMajorGroupCode(anzscoCode) : ""
 
-  const [showTutorial, setShowTutorial] = useState(false)
+  // Local state
+
   const [selectedState, setSelectedState] = useState<string | null>(null)
 
-  const { data: shortage, isLoading: shortageLoading, isFetching: shortageRefetching } =
-    useShortage(anzscoCode)
-  const { data: career, isLoading: careerLoading, error: careerError } =
-    useCareerGrowth(majorGroup)
+  // Fetch data from APIs
+  const { 
+    data: shortage, 
+    isLoading: shortageLoading, 
+    isFetching: shortageRefetching 
+  } = useShortage(anzscoCode)
+  
+  const { 
+    data: career, 
+    isLoading: careerLoading, 
 
+  } = useCareerGrowth(majorGroup)
+
+  // Normalize geographic data
   const geoData: FeatureCollection<Geometry, StateProps> = useMemo(
     () => normalizeAuStates(rawGeo as FeatureCollection<Geometry, Record<string, unknown>>),
     []
   )
 
+  // Process employment values for map visualization
   const employmentValues = useMemo(() => toEmploymentValues(shortage), [shortage])
   const mapHasData = hasAnyData(employmentValues)
   const isInitialLoading = (careerLoading || shortageLoading) && !career && !shortage
 
-  // Normalize backend response to safe UI values
+  // Normalize career growth data to safe UI values
   const safeCareer = useMemo(() => {
     if (!career) return null
     const c = career as unknown as Partial<CareerGrowthResponse>
@@ -222,93 +255,89 @@ function InsightInner(): React.ReactElement {
     }
   }, [career])
 
+  // Show empty state if no occupation is selected
   if (!anzscoCode) return <NoOccupationSelected />
 
   return (
     <>
-      {/* Hero header with explicit ID for tutorial "welcome"/"complete" */}
+      {/* Hero header with tutorial button (ONLY shows when job is selected) */}
       <div id="hero-section" className="relative">
         <HeroIntro
           title="Your Personalized Career Insights"
           description={
             safeCareer
-              ? `Comprehensive data for ${safeCareer.majorGroupTitle}. Explore growth projections and demand.`
-              : `Loading career insights for ANZSCO ${anzscoCode}...`
+              ? `Comprehensive data for ${safeCareer.majorGroupTitle}. Explore employment trends, growth projections, and regional demand across Australia.`
+              : "Loading career insights..."
           }
-          image="../../"
+          image={InsightImage}
           tone="blue"
           imageDecorative
         />
-        <TopRightTutorialButton onClick={() => setShowTutorial(true)} />
+        
+        {/* Tutorial launcher - only visible when occupation is selected */}
+        <TutorialLauncher
+          steps={insightTutorialSteps}
+          placement="top-right"
+          label="View Tutorial"
+          variant="outline"
+          ariaLabel="View Career Insights Tutorial"
+        />
       </div>
 
-      {/* Content container */}
-      <div className="mx-auto max-w-7xl space-y-8 px-4 py-12 sm:px-6 lg:px-8">
+      {/* Main content area */}
+      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
         {isInitialLoading ? (
           <LoadingSkeleton />
         ) : (
           <>
-            {careerError && (
-              <div className="rounded-xl border border-red-200 bg-red-50 p-6 shadow-sm" role="alert">
-                <h3 className="mb-1 text-lg font-semibold text-red-900">Unable to Load Career Data</h3>
-                <p className="text-sm text-red-800">
-                  Try again later or{" "}
-                  <Link to="/feedback" className="font-medium underline hover:text-red-900">
-                    send feedback
-                  </Link>
-                  .
+            {/* Job title section with ID for tutorial targeting */}
+            {safeCareer && (
+              <div id="job-title" className="mb-8">
+                <h2 className="text-2xl font-bold text-ink sm:text-3xl">
+                  {safeCareer.majorGroupTitle}
+                </h2>
+                <p className="mt-2 text-sm text-ink-soft">
+                  ANZSCO Major Group: {safeCareer.anzscoCode.slice(0, 4)}
                 </p>
               </div>
             )}
 
-            {/* Major group title block: id = job-title */}
+            {/* Quick statistics section */}
             {safeCareer && (
-              <section id="job-title" aria-labelledby="group-title-label">
-                <h2 id="group-title-label" className="mb-2 text-xl font-semibold text-ink">
-                  Major Group Title
-                </h2>
-                <div className="rounded-xl border border-primary/30 bg-primary/5 px-5 py-4 text-center text-lg font-bold text-primary shadow-sm">
-                  {safeCareer.majorGroupTitle || "Unknown Major Group"}
+              <section id="quick-stats" className="mb-8">
+                <SectionHeader
+                  title="Quick Statistics"
+                  helpContent="Overview of key metrics for this occupation group including growth rates and rankings."
+                />
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+                    <div className="text-sm text-slate-600">5-Year Growth</div>
+                    <div className="mt-1 text-2xl font-bold text-primary">
+                      {safeCareer.fiveYearGrowthRate}%
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+                    <div className="text-sm text-slate-600">10-Year Growth</div>
+                    <div className="mt-1 text-2xl font-bold text-primary">
+                      {safeCareer.tenYearGrowthRate}%
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+                    <div className="text-sm text-slate-600">National Ranking</div>
+                    <div className="mt-1 text-2xl font-bold text-primary">
+                      {safeCareer.growthRanking}
+                    </div>
+                  </div>
                 </div>
               </section>
             )}
 
-            {/* Quick stats panel: id = quick-stats */}
-            <section id="quick-stats" className="rounded-2xl border border-slate-100 bg-white p-6 shadow-md">
-              <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
-                <div className="text-center">
-                  <div className="mb-1 text-3xl font-bold text-slate-900">
-                    {safeCareer ? `${safeCareer.fiveYearGrowthRate > 0 ? "+" : ""}${safeCareer.fiveYearGrowthRate.toFixed(1)}%` : "-"}
-                  </div>
-                  <div className="text-sm text-slate-600">Avg. Growth Rate (5y)</div>
-                </div>
-                <div className="text-center">
-                  <div className="mb-1 text-2xl font-bold text-slate-900">
-                    {safeCareer?.growthRanking || "N/A"}
-                  </div>
-                  <div className="text-sm text-slate-600">Growth Ranking</div>
-                </div>
-                <div className="text-center">
-                  <div className="mb-1 text-3xl font-bold text-slate-900">
-                    {safeCareer ? safeCareer.currentEmployment.toLocaleString("en-AU") : "-"}
-                  </div>
-                  <div className="text-sm text-slate-600">Current Employment</div>
-                </div>
-                <div className="text-center">
-                  <div className="mb-1 text-3xl font-bold text-slate-900">
-                    {safeCareer ? safeCareer.projectedNewJobs.toLocaleString("en-AU") : "-"}
-                  </div>
-                  <div className="text-sm text-slate-600">Projected New Jobs</div>
-                </div>
-              </div>
-            </section>
-
-            {/* Major group stats card: id = growth-statistics */}
+            {/* Growth statistics section */}
             {safeCareer && (
-              <section id="growth-statistics">
+              <section id="growth-statistics" className="mb-8">
                 <SectionHeader
-                  title="Major Group Statistics"
-                  helpContent="Key growth metrics and employment levels for the major group."
+                  title="Growth Statistics"
+                  helpContent="Detailed employment statistics and projections for this major occupation group."
                 />
                 <OccupationGrowthStats
                   anzscoCode={safeCareer.anzscoCode}
@@ -322,12 +351,12 @@ function InsightInner(): React.ReactElement {
               </section>
             )}
 
-            {/* Growth comparison chart: id = growth-comparison */}
+            {/* Growth comparison chart section */}
             {safeCareer && (
-              <section id="growth-comparison">
+              <section id="growth-comparison" className="mb-8">
                 <SectionHeader
-                  title="Growth Rate Comparison"
-                  helpContent="Compare your occupation's projected growth with related occupations and the national average."
+                  title="Growth Comparison"
+                  helpContent="Compare this occupation's growth rate with related occupations and national average."
                 />
                 <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-md">
                   <GrowthComparisonChart
@@ -340,11 +369,11 @@ function InsightInner(): React.ReactElement {
               </section>
             )}
 
-            {/* Map: id = geographic-map */}
+            {/* Geographic distribution map section */}
             <section id="geographic-map">
               <SectionHeader
                 title="Geographic Distribution"
-                helpContent="Click a state to view employment values. Darker shades indicate higher values."
+                helpContent="Click a state to view employment values. Darker shades indicate higher demand."
               />
               <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-md">
                 {shortageLoading || shortageRefetching ? (
@@ -363,15 +392,17 @@ function InsightInner(): React.ReactElement {
                 )}
               </div>
 
+              {/* Selected state display */}
               {mapHasData && selectedState && (
                 <p className="mt-3 text-center text-sm text-ink-soft">
                   Selected: <span className="font-medium text-ink">{selectedState}</span>
                 </p>
               )}
 
+              {/* No data message */}
               {!mapHasData && !(shortageLoading || shortageRefetching) && (
                 <p className="mt-3 text-center text-sm text-ink-soft">
-                  No regional employment data available.
+                  No regional employment data available for this occupation.
                 </p>
               )}
             </section>
@@ -379,12 +410,20 @@ function InsightInner(): React.ReactElement {
         )}
       </div>
 
-      {/* Tutorial modal (steps reference the IDs added above) */}
-      <Tutorial steps={insightTutorialSteps} isOpen={showTutorial} onClose={() => setShowTutorial(false)} />
+      {/* Tutorial modal - steps reference the section IDs above */}
+      <TutorialLauncher
+        steps={insightTutorialSteps}
+        placement="top-right"
+        label="View Tutorial"
+        variant="outline"
+      />
     </>
   )
 }
 
+/**
+ * Insight - Main export component with error boundary
+ */
 export default function Insight(): React.ReactElement {
   return (
     <ErrorBoundary feedbackHref="/feedback">
