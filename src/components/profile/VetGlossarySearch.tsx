@@ -74,7 +74,7 @@ export default function VetGlossarySearch({ className = "" }: VetGlossarySearchP
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Enter a term (e.g., UIS)"
+            placeholder="Enter a term (e.g., USI)"
             className="w-full px-4 py-2 pr-10 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
             aria-label="Search VET terminology"
           />
