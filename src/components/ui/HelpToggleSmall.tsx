@@ -1,4 +1,8 @@
 // src/components/ui/HelpToggleSmall.tsx
+// Lightweight tooltip component for contextual help
+// Fixed: No more bouncing/flickering on small screens
+// All English comments
+
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import clsx from "clsx";
 import { HelpCircle } from "lucide-react";
@@ -33,6 +37,7 @@ type Props = {
  * - Screen reader accessible with proper ARIA attributes
  * - Flexible interaction modes: hover, click, or both
  * - Smooth animations with Tailwind
+ * - Fixed: No infinite re-positioning loops on small screens
  * 
  * @example
  * <HelpToggleSmall
@@ -58,6 +63,7 @@ export default function HelpToggleSmall({
   const rootRef = useRef<HTMLSpanElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
+  const isAdjustingRef = useRef<boolean>(false); // Prevent infinite adjustment loops
   
   // Unique ID for ARIA relationship
   const id = useId();
@@ -65,31 +71,56 @@ export default function HelpToggleSmall({
   /**
    * Smart positioning: Adjust tooltip position to stay within viewport
    * Prevents tooltip from being cut off at screen edges
+   * 
+   * FIXED: Use requestAnimationFrame to prevent infinite loops
+   * and add threshold to avoid micro-adjustments
    */
   useEffect(() => {
     if (!open || !tooltipRef.current || !triggerRef.current) return;
+    if (isAdjustingRef.current) return; // Prevent re-entrant calls
 
-    const tooltip = tooltipRef.current;
-    const tooltipRect = tooltip.getBoundingClientRect();
-    let newPlacement = placement;
+    isAdjustingRef.current = true;
 
-    // Check horizontal boundaries
-    if (tooltipRect.right > window.innerWidth - 10) {
-      newPlacement = "left";
-    } else if (tooltipRect.left < 10) {
-      newPlacement = "right";
-    }
+    // Use RAF to batch DOM reads and prevent layout thrashing
+    requestAnimationFrame(() => {
+      const tooltip = tooltipRef.current;
+      const trigger = triggerRef.current;
+      
+      if (!tooltip || !trigger) {
+        isAdjustingRef.current = false;
+        return;
+      }
 
-    // Check vertical boundaries
-    if (tooltipRect.bottom > window.innerHeight - 10) {
-      newPlacement = "top";
-    } else if (tooltipRect.top < 10) {
-      newPlacement = "bottom";
-    }
+      const tooltipRect = tooltip.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      
+      // Add threshold to prevent micro-adjustments (10px buffer)
+      const threshold = 10;
+      let newPlacement = placement;
 
-    if (newPlacement !== adjustedPlacement) {
-      setAdjustedPlacement(newPlacement);
-    }
+      // Check horizontal boundaries with threshold
+      if (tooltipRect.right > viewportWidth - threshold) {
+        newPlacement = "left";
+      } else if (tooltipRect.left < threshold) {
+        newPlacement = "right";
+      }
+
+      // Check vertical boundaries with threshold
+      // Only override horizontal adjustment if necessary
+      if (tooltipRect.bottom > viewportHeight - threshold) {
+        newPlacement = "top";
+      } else if (tooltipRect.top < threshold) {
+        newPlacement = "bottom";
+      }
+
+      // Only update if placement actually changed
+      if (newPlacement !== adjustedPlacement) {
+        setAdjustedPlacement(newPlacement);
+      }
+
+      isAdjustingRef.current = false;
+    });
   }, [open, placement, adjustedPlacement]);
 
   /**
