@@ -272,6 +272,9 @@ export default function AnalyzerJobSuggestion(): React.ReactElement {
       if (unmatched) break;
     }
 
+    // Debug: inspect unmatched buckets before persisting
+    console.log("[AnalyzerJobSuggestion] Computed unmatched buckets:", unmatched);
+
     dispatch(setSelectedJobUnmatched(unmatched));
     goNext();
   };

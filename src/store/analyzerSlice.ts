@@ -3,8 +3,7 @@
 
 import { createSlice } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
-import type { TrainingCourse } from "../components/analyzer/TrainingCourse";
-
+import type { TrainingCourse } from "../types/training";
 export type AType = "knowledge" | "tech" | "skill";
 
 /** Minimal ability unit selected by user */
@@ -22,7 +21,7 @@ export type UnmatchedBuckets = { knowledge: string[]; skill: string[]; tech: str
 /** Training advice persisted from the Training step */
 export type TrainingAdviceState = {
   occupation: { code: string; title: string };
-  courses: TrainingCourse[];
+  courses: TrainingCourse[]; 
 };
 
 /** Full Analyzer slice state */

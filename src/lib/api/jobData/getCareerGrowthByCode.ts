@@ -1,6 +1,6 @@
 
 import { getJSON } from "../apiClient";
-import type { CareerGrowthResponse } from "../..//../types/careerGroth";
+import type { CareerGrowthResponse } from "../../../types/careerGrowth";
 
 /**
  * Fetch career growth data by 4-digit ANZSCO code
