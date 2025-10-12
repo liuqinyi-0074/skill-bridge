@@ -31,7 +31,7 @@ export const getProfileTutorialSteps = (): TutorialStep[] => [
     target: "#career-intent .lg\\:table td:first-child", // Desktop first column
     title: "Your Past Roles Matter ",
     content:
-      "Click 'Edit' to search and add up to 5 past occupations. These help us understand your existing experience and identify transferable skills when matching you to new roles.",
+      "Click 'Edit' to search and add up to 5 past occupations.",
     placement: "bottom",
   },
 
@@ -41,7 +41,7 @@ export const getProfileTutorialSteps = (): TutorialStep[] => [
     target: "#career-intent .lg\\:table td:nth-child(2)", // Desktop second column
     title: "Choose Your Target Occupation ",
     content:
-      "This is crucial! Select the occupation you're aiming for. Once set, we'll automatically analyze the skills you're missing and suggest relevant training courses. You can change this anytime.",
+      "This is crucial! Select the occupation you're aiming for. Once set, we'll automatically analyze the suggest relevant training courses. You can change this anytime.",
     placement: "top",
   },
 
@@ -51,7 +51,7 @@ export const getProfileTutorialSteps = (): TutorialStep[] => [
     target: "#career-intent .lg\\:table td:last-child", // Desktop third column
     title: "Set Your Preferred Region ",
     content:
-      "Choose the Australian state or territory where you want to work. This helps us provide location-specific industry insights and job market trends.",
+      "Choose the Australian state or territory where you want to work. ",
     placement: "top",
   },
 
@@ -111,7 +111,7 @@ export const getProfileTutorialSteps = (): TutorialStep[] => [
     target: "#vet-terminology",
     title: "Step 4: Understand Course Jargon ",
     content:
-      "Confused by terms like 'AQF', 'RPL', or 'Unit of Competency'? Use this VET Terminology Dictionary to look up unfamiliar terms before enrolling in courses. It helps you make informed decisions about your training.",
+      "Confused by terms? Use this VET Terminology Dictionary to look up unfamiliar terms before enrolling in courses. It helps you make informed decisions about your training.",
     placement: "top",
   },
 
@@ -121,7 +121,7 @@ export const getProfileTutorialSteps = (): TutorialStep[] => [
     target: "#vet-terminology input", // Search box
     title: "Quick Terminology Lookup ",
     content:
-      "Simply type any term you're unsure about (e.g., 'qualification levels', 'credit transfer'), and we'll show you a clear explanation. This saves you time researching on your own.",
+      "Simply type any term you're unsure about, and we'll show you a clear explanation. This saves you time researching on your own.",
     placement: "bottom",
   },
 
@@ -145,17 +145,7 @@ export const getProfileTutorialSteps = (): TutorialStep[] => [
     placement: "left",
   },
 
-  // Step 15: Auto-save notification
-  {
-    id: "auto-save-notice",
-    target: "#profile-header",
-    title: "Your Progress Is Saved ",
-    content:
-      "Good news! All changes you make here are automatically saved to your browser. Your career intent, skill roadmap, and training preferences will be here when you return. No need to worry about losing your work!",
-    placement: "bottom",
-  },
-
-  // Step 16: Final recommendation - call to action
+  // Step 15: Final recommendation - call to action
   {
     id: "final-action-call",
     target: "#career-intent",

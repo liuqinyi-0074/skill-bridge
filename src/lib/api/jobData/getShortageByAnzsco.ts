@@ -20,7 +20,6 @@ export async function getShortageByAnzsco(code: string): Promise<ShortageRes> {
       { timeoutMs: 60000 } // 60 seconds timeout
     );
     
-    console.log("✅ Shortage API Success:", result);
     return result;
   } catch (err) {
     console.error("❌ Shortage API Error:", err);

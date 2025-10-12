@@ -13,7 +13,7 @@ export interface CareerGrowthRequest {
 export interface CareerGrowthResponse {
   /** Queried ANZSCO code */
   anzscoCode: string;
-  /** Major group title (e.g., "ICT Professionals") */
+  /** Major group title */
   majorGroupTitle: string;
   
   /** 5-year growth rate (%) */
@@ -34,24 +34,9 @@ export interface CareerGrowthResponse {
   relatedOccupationsRate: number;
   /** Growth rate of the selected occupation (%) */
   selectedOccupationRate: number;
-  
-  /** Employment data for related industries */
-  relatedIndustryEmployment: IndustryEmployment[];
-  /** Employment data for selected industries */
-  selectedIndustryEmployment: IndustryEmployment[];
+
 }
 
-/**
- * Industry employment data structure
- */
-export interface IndustryEmployment {
-  /** Industry name */
-  industryName: string;
-  /** Employment count in this industry */
-  employment: number;
-  /** Percentage of total employment */
-  percentage: number;
-}
 
 
 

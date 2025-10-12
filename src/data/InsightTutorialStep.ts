@@ -14,11 +14,19 @@ export const insightTutorialSteps: TutorialStep[] = [
     placement: "bottom",
   },
   {
+    id: "job-title",
+    target: "#job-title",
+    title: "your target job group",
+    content:
+      "This is your target job group.",
+    placement: "bottom",
+  },
+  {
     id: "quick-stats",
     target: "#quick-stats",
     title: "Quick Statistics Overview",
     content:
-      "Get a snapshot of key metrics at a glance: active regions with job opportunities, total employment numbers, projected growth rates, and national rankings.",
+      "Get a snapshot of key metrics at a glance: projected growth rates, and national rankings.",
     placement: "bottom",
   },
   {
@@ -35,14 +43,6 @@ export const insightTutorialSteps: TutorialStep[] = [
     title: "Growth Rate Comparison",
     content:
       "Compare your occupation's growth rate against related occupations and the national average. This helps you understand how your field performs relative to others.",
-    placement: "bottom",
-  },
-  {
-    id: "industry-employment",
-    target: "#industry-employment",
-    title: "Employment by Industry",
-    content:
-      "See which industries employ the most people in your occupation. Selected industries are highlighted, helping you identify the best sectors for career opportunities.",
     placement: "bottom",
   },
   {

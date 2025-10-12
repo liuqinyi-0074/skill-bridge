@@ -157,17 +157,14 @@ export default function AnalyzerSkillGap(): React.ReactElement {
         title: "Understanding your skill gaps",
         subtitle: "Review the skills you're missing for your target role.",
         features: [
-          "Skills are categorized by type (Knowledge, Technical, General Skills).",
           "Each skill represents an ability you'll need to develop or acquire.",
           "Plan your learning journey by addressing these gaps systematically.",
         ],
         howTo: [
-          "Review each category to understand where you need to improve.",
           "Export this report as PDF to track your progress over time.",
           "Use this information to guide your training and development choices.",
         ],
         tips: [
-          "Focus on the most critical skills first.",
           "Some skills may be learned on the job, others may require formal training.",
           "Don't be discouraged by the list - everyone has skill gaps!",
         ],

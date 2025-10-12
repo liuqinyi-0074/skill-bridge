@@ -87,7 +87,7 @@ function PageBody(): React.ReactElement {
   const dispatch = useDispatch();
 
   // Tutorial state
-  const [showTutorial, setShowTutorial] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(true);
 
   // Read persisted selections to hydrate local drafts
   const persisted = useSelector((s: RootState) => s.analyzer);

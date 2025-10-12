@@ -22,14 +22,7 @@ export const getInfoTutorialSteps: TutorialStep[] = [
     id: "search-roles",
     target: "[data-section='role-search']",
     title: "Search for Roles",
-    content: "Start by searching for occupations that interest you. Select an industry first, then type keywords to find relevant roles. You can select up to 5 roles that match your career interests.",
-    placement: "bottom"
-  },
-  {
-    id: "search-roles",
-    target: "[data-section='role-search']",
-    title: "Search for Roles",
-    content: "Start by searching for occupations that interest you. Select an industry first, then type keywords to find relevant roles. You can select up to 5 roles that match your career interests.",
+    content: "Start by searching for your past occupations. Select an industry first, then type keywords to find relevant roles. You can select up to 5 roles that match your career interests.",
     placement: "bottom"
   },
   {

@@ -87,14 +87,6 @@ export default function OccupationGrowthStats({
   return (
     <div className={`rounded-xl border border-border bg-white shadow-card p-6 ${className}`}>
       {/* Title Section */}
-      <div className="mb-6">
-        <h3 className="text-xl font-heading font-bold text-ink">
-          {majorGroupTitle}
-        </h3>
-        <p className="text-sm text-ink-soft mt-1">
-          ANZSCO Major Group: {anzscoCode.slice(0, 4)}
-        </p>
-      </div>
 
       {/* Stats Grid - Two columns on larger screens */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

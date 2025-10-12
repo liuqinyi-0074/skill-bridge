@@ -1,28 +1,28 @@
 // src/pages/Profile.tsx
 // Page: Profile
-// - Header with tutorial button (matching Insight page style, no yellow background)
-// - Reads Redux first, then falls back to route state once (no rewrite)
+// - View Tutorial stays in the page header top-right (original position)
+// - “Export PDF” button stays near Career Intent on the right, below the top edge
 // - SkillRoadMap shows ONLY abilities from `selectedJobUnmatched`
-// - Auto-fetch training advice when target job changes and persist to Redux
+// - Auto-fetches training advice on target job change and persists to Redux
 // - Converts between Redux format ({ code, title }) and UI format ({ id, title })
-// - Tutorial is a page-level overlay, launched by a button in header
+// - Accessible UI with clear headings and controls
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { useSelector } from "react-redux";
-import type { RootState } from "../store";
-import { useAppDispatch } from "../store/hooks";
+import React, { useEffect, useMemo, useRef, useState } from "react"
+import {useLocation } from "react-router-dom"
+import { useSelector } from "react-redux"
+import type { RootState } from "../store"
+import { useAppDispatch } from "../store/hooks"
 
 // UI Components
-import HelpToggleSmall from "../components/ui/HelpToggleSmall";
+import HelpToggleSmall from "../components/ui/HelpToggleSmall"
 import CareerChoicePanel, {
   type CareerChoiceState,
   type OccupationSearchInputs,
-} from "../components/profile/CareerChoicePanel";
-import SkillRoadMap, { type SkillRoadmapItem } from "../components/profile/SkillRoadMap";
-import TrainingAdviceList, { type TrainingAdvice } from "../components/profile/TrainingAdviceList";
-import VetGlossarySearch from "../components/profile/VetGlossarySearch";
-import Tutorial from "../components/tutorial/Tutorial";
+} from "../components/profile/CareerChoicePanel"
+import SkillRoadMap, { type SkillRoadmapItem } from "../components/profile/SkillRoadMap"
+import TrainingAdviceList, { type TrainingAdvice } from "../components/profile/TrainingAdviceList"
+import VetGlossarySearch from "../components/profile/VetGlossarySearch"
+import TutorialLauncher from "../components/tutorial/TutorialLauncher"
 
 // Redux actions + types
 import {
@@ -32,35 +32,31 @@ import {
   setPreferredRegion,
   setSelectedJob,
   setTrainingAdvice,
-} from "../store/analyzerSlice";
+} from "../store/analyzerSlice"
 import type {
   AbilityLite,
   UnmatchedBuckets,
   RoleLite,
   SelectedJob,
   TrainingAdviceState,
-} from "../store/analyzerSlice";
+} from "../store/analyzerSlice"
 
 // Data and hooks
-import { industryOptions, industryNameOf } from "../data/industries";
-import { useAnzscoSearch } from "../hooks/queries/userAnzscoSearch";
-import type { SearchParams } from "../hooks/queries/userAnzscoSearch";
-import { useTrainingAdvice } from "../hooks/queries/useTrainingAdvice";
-import { getProfileTutorialSteps } from "../data/ProfileTutorialSteps";
-import type { TutorialStep } from "../components/tutorial/Tutorial";
-import type { AnalyzerRouteState } from "../types/routes";
-import type { AnzscoOccupation } from "../types/domain";
-import type { TrainingAdviceRes, VetCourse, TrainingCourse } from "../types/training";
+import { industryOptions, industryNameOf } from "../data/industries"
+import { useAnzscoSearch } from "../hooks/queries/userAnzscoSearch"
+import type { SearchParams } from "../hooks/queries/userAnzscoSearch"
+import { useTrainingAdvice } from "../hooks/queries/useTrainingAdvice"
+import { getProfileTutorialSteps } from "../data/ProfileTutorialSteps"
+import type { AnalyzerRouteState } from "../types/routes"
+import type { AnzscoOccupation } from "../types/domain"
+import type { TrainingAdviceRes, VetCourse, TrainingCourse } from "../types/training"
+
+// Utils
+import { exportElementToPdf } from "../lib/utils/pdf"
 
 // ============================================================================
 // Constants
 // ============================================================================
-
-/** Build a public TGA/VET link when only a code is present */
-const fallbackCourseUrl = (code: string): string =>
-  `https://training.gov.au/training/details/${encodeURIComponent(code)}`;
-
-/** Region options for single-select */
 const REGION_OPTIONS = [
   "New South Wales",
   "Victoria",
@@ -70,137 +66,122 @@ const REGION_OPTIONS = [
   "Tasmania",
   "Northern Territory",
   "Australian Capital Territory",
-];
+]
 
 // ============================================================================
 // Types
 // ============================================================================
-
-type SelectedJobValue = Exclude<SelectedJob, null>;
+type SelectedJobValue = Exclude<SelectedJob, null>
 
 // ============================================================================
-// Helper Functions
+// Helpers
 // ============================================================================
+const fallbackCourseUrl = (code: string): string =>
+  `https://training.gov.au/training/details/${encodeURIComponent(code)}`
 
-/** Safe string normalization */
-const normName = (v: unknown): string => (typeof v === "string" ? v : "");
+const normName = (v: unknown): string => (typeof v === "string" ? v : "")
 
-/** Normalize roles into RoleLite[] with { id, title } */
 const normalizeRoles = (roles: Array<RoleLite | string> | null | undefined): RoleLite[] => {
-  if (!Array.isArray(roles)) return [];
-  const seen = new Set<string>();
-  const out: RoleLite[] = [];
+  if (!Array.isArray(roles)) return []
+  const seen = new Set<string>()
+  const out: RoleLite[] = []
   for (const role of roles) {
-    if (!role) continue;
-    const id = (typeof role === "string" ? role : role.id ?? "").trim();
-    if (!id || seen.has(id)) continue;
-    seen.add(id);
-    const title = typeof role === "string" ? role : role.title || id;
-    out.push({ id, title });
+    if (!role) continue
+    const id = (typeof role === "string" ? role : role.id ?? "").trim()
+    if (!id || seen.has(id)) continue
+    seen.add(id)
+    const title = typeof role === "string" ? role : role.title || id
+    out.push({ id, title })
   }
-  return out;
-};
+  return out
+}
 
-/** Normalize selected job into { code, title } | null */
 const normalizeSelectedJob = (
   job: SelectedJob | string | null | undefined
 ): SelectedJobValue | null => {
-  if (!job) return null;
+  if (!job) return null
   if (typeof job === "string") {
-    const code = job.trim();
-    if (!code) return null;
-    return { code, title: code };
+    const code = job.trim()
+    if (!code) return null
+    return { code, title: code }
   }
-  const code = (job.code ?? "").trim();
-  if (!code) return null;
-  return { code, title: job.title || code };
-};
+  const code = (job.code ?? "").trim()
+  if (!code) return null
+  return { code, title: job.title || code }
+}
 
-/** Unique key for AbilityLite; null if invalid */
 const abilityKey = (a: AbilityLite): string | null => {
-  const name = normName((a as { name?: unknown }).name);
+  const name = normName((a as { name?: unknown }).name)
   const code =
-    typeof (a as { code?: unknown }).code === "string" ? (a as { code?: string }).code : "";
-  if (!name && !code) return null;
-  return `${a.aType}:${code || name.toLowerCase()}`;
-};
+    typeof (a as { code?: unknown }).code === "string" ? (a as { code?: string }).code : ""
+  if (!name && !code) return null
+  return `${a.aType}:${code || name.toLowerCase()}`
+}
 
-/** Unique key for SkillRoadmapItem; null if invalid */
 const roadmapKey = (it: SkillRoadmapItem): string | null => {
-  const name = normName((it as { skill?: unknown }).skill);
+  const name = normName((it as { skill?: unknown }).skill)
   const code =
-    typeof (it as { code?: unknown }).code === "string" ? (it as { code?: string }).code : "";
-  if (!name && !code) return null;
-  return `${it.abilityType}:${code || name.toLowerCase()}`;
-};
+    typeof (it as { code?: unknown }).code === "string" ? (it as { code?: string }).code : ""
+  if (!name && !code) return null
+  return `${it.abilityType}:${code || name.toLowerCase()}`
+}
 
-/** Unique identity string used for keys */
 const abilityIdentityKey = (ability: AbilityLite): string => {
-  const name = normName(ability.name);
-  const base = ability.code ?? name;
-  const safe = base ? encodeURIComponent(base) : `unnamed-${ability.aType}`;
-  return `${ability.aType}:${safe}`;
-};
+  const name = normName(ability.name)
+  const base = ability.code ?? name
+  const safe = base ? encodeURIComponent(base) : `unnamed-${ability.aType}`
+  return `${ability.aType}:${safe}`
+}
 
-/** Unique filter for abilities with guards */
 const uniqueAbilities = (abilities: AbilityLite[]): AbilityLite[] => {
-  const seen = new Set<string>();
-  const result: AbilityLite[] = [];
+  const seen = new Set<string>()
+  const result: AbilityLite[] = []
   for (const a of abilities) {
-    const k = abilityKey(a);
-    const name = normName(a.name);
-    if (!k || !name) continue;
+    const k = abilityKey(a)
+    const name = normName(a.name)
+    if (!k || !name) continue
     if (!seen.has(k)) {
-      seen.add(k);
-      result.push({ ...a, name });
+      seen.add(k)
+      result.push({ ...a, name })
     }
   }
-  return result;
-};
+  return result
+}
 
-/** Collapse unmatched buckets into flat abilities */
 const collapseUnmatchedBuckets = (b: UnmatchedBuckets | null | undefined): AbilityLite[] => {
-  if (!b) return [];
-
+  if (!b) return []
   const extract = (entry: unknown): { name: string; code?: string } | null => {
     if (typeof entry === "string") {
-      const trimmed = entry.trim();
-      return trimmed ? { name: trimmed } : null;
+      const trimmed = entry.trim()
+      return trimmed ? { name: trimmed } : null
     }
     if (entry && typeof entry === "object") {
-      const obj = entry as { name?: unknown; title?: unknown; label?: unknown; code?: unknown };
+      const obj = entry as { name?: unknown; title?: unknown; label?: unknown; code?: unknown }
       const code =
-        typeof obj.code === "string" && obj.code.trim().length > 0 ? obj.code.trim() : undefined;
+        typeof obj.code === "string" && obj.code.trim().length > 0 ? obj.code.trim() : undefined
       const candidate =
         (typeof obj.name === "string" && obj.name.trim()) ||
         (typeof obj.title === "string" && obj.title.trim()) ||
         (typeof obj.label === "string" && obj.label.trim()) ||
         code ||
-        "";
-      const name = candidate.trim();
-      return name ? { name, code } : null;
+        ""
+      const name = candidate.trim()
+      return name ? { name, code } : null
     }
-    return null;
-  };
-
+    return null
+  }
   const collect = (list: unknown[] | undefined, aType: AbilityLite["aType"]): AbilityLite[] =>
     (list ?? [])
       .map(extract)
       .filter((item): item is { name: string; code?: string } => item !== null)
-      .map((item) => ({
-        name: item.name,
-        code: item.code,
-        aType,
-      }));
-
+      .map((item) => ({ name: item.name, code: item.code, aType }))
   return [
     ...collect(b.skill as unknown[] | undefined, "skill"),
     ...collect(b.knowledge as unknown[] | undefined, "knowledge"),
     ...collect(b.tech as unknown[] | undefined, "tech"),
-  ];
-};
+  ]
+}
 
-/** Map abilities to Roadmap items WITHOUT category (API doesn't provide it) */
 const toSkillRoadmapItems = (abilities: AbilityLite[]): SkillRoadmapItem[] =>
   abilities.map((ability, index) => ({
     id: `${abilityIdentityKey(ability)}:${index}`,
@@ -210,24 +191,22 @@ const toSkillRoadmapItems = (abilities: AbilityLite[]): SkillRoadmapItem[] =>
     code: typeof ability.code === "string" ? ability.code : undefined,
     startDate: undefined,
     endDate: undefined,
-  }));
+  }))
 
-/** De-duplicate SkillRoadmapItem safely */
 const dedupeRoadmapItems = (items: SkillRoadmapItem[]): SkillRoadmapItem[] => {
-  const seen = new Set<string>();
-  const out: SkillRoadmapItem[] = [];
+  const seen = new Set<string>()
+  const out: SkillRoadmapItem[] = []
   for (const it of items) {
-    const k = roadmapKey(it);
-    if (!k) continue;
+    const k = roadmapKey(it)
+    if (!k) continue
     if (!seen.has(k)) {
-      seen.add(k);
-      out.push(it);
+      seen.add(k)
+      out.push(it)
     }
   }
-  return out;
-};
+  return out
+}
 
-/** Map server response (anzsco + vet_courses) to Redux TrainingAdviceState */
 function mapAdviceResToState(
   res: TrainingAdviceRes,
   fallbackOcc: { code: string; title: string }
@@ -235,36 +214,30 @@ function mapAdviceResToState(
   const occ = {
     code: res?.anzsco?.code ?? fallbackOcc.code,
     title: res?.anzsco?.title ?? fallbackOcc.title,
-  };
-
-  // Map VetCourse[] to TrainingCourse[] with url
-  const courses: TrainingCourse[] = [];
-  const list: VetCourse[] = Array.isArray(res?.vet_courses) ? res.vet_courses : [];
-
-  for (const c of list) {
-    const id = typeof c.vet_course_code === "string" ? c.vet_course_code.trim() : "";
-    const name = typeof c.course_name === "string" ? c.course_name.trim() : "";
-    if (!id || !name) continue;
-    const url = fallbackCourseUrl(id);
-    courses.push({ id, name, url });
   }
-
-  return { occupation: occ, courses };
+  const list: VetCourse[] = Array.isArray(res?.vet_courses) ? res.vet_courses : []
+  const courses: TrainingCourse[] = list
+    .map((c) => ({
+      id: (c.vet_course_code ?? "").trim(),
+      name: (c.course_name ?? "").trim(),
+      url: fallbackCourseUrl(c.vet_course_code ?? ""),
+    }))
+    .filter((c) => c.id && c.name)
+  return { occupation: occ, courses }
 }
 
 // ============================================================================
-// SelectQuestion Component (Modal for region selection)
+// SelectQuestion (modal)
 // ============================================================================
-
 type SelectQuestionProps = {
-  title: string;
-  open: boolean;
-  options: string[];
-  value: string | null;
-  onClose: () => void;
-  onSave: (value: string) => void;
-  helperText?: string;
-};
+  title: string
+  open: boolean
+  options: string[]
+  value: string | null
+  onClose: () => void
+  onSave: (value: string) => void
+  helperText?: string
+}
 
 const SelectQuestion: React.FC<SelectQuestionProps> = ({
   title,
@@ -275,25 +248,23 @@ const SelectQuestion: React.FC<SelectQuestionProps> = ({
   onSave,
   helperText,
 }) => {
-  const [selected, setSelected] = useState(value);
-
+  const [selected, setSelected] = useState(value)
   useEffect(() => {
-    if (open) setSelected(value);
-  }, [open, value]);
-
-  if (!open) return null;
+    if (open) setSelected(value)
+  }, [open, value])
+  if (!open) return null
 
   return (
-    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-modal w-full max-w-md p-6 space-y-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+      <div className="w-full max-w-md space-y-4 rounded-xl bg-white p-6 shadow-modal">
         <div className="flex items-center justify-between">
           <h3 className="text-xl font-heading font-bold text-ink">{title}</h3>
           <button
             onClick={onClose}
-            className="p-1 hover:bg-gray-100 rounded-lg transition"
+            className="rounded-lg p-1 transition hover:bg-gray-100"
             aria-label="Close"
           >
-            <svg className="w-5 h-5 text-ink-soft" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="h-5 w-5 text-ink-soft" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -301,12 +272,12 @@ const SelectQuestion: React.FC<SelectQuestionProps> = ({
 
         {helperText && <p className="text-sm text-ink-soft">{helperText}</p>}
 
-        <div className="space-y-2 max-h-[400px] overflow-y-auto">
+        <div className="max-h-[400px] space-y-2 overflow-y-auto">
           {options.map((opt) => (
             <button
               key={opt}
               onClick={() => setSelected(opt)}
-              className="w-full text-left px-4 py-2 rounded-lg border transition"
+              className="w-full rounded-lg border px-4 py-2 text-left transition"
               style={{
                 borderColor: selected === opt ? "#5E75A4" : "#e2e8f0",
                 backgroundColor: selected === opt ? "#5E75A4" : "white",
@@ -321,252 +292,213 @@ const SelectQuestion: React.FC<SelectQuestionProps> = ({
         <div className="flex gap-3">
           <button
             onClick={() => {
-              if (selected) onSave(selected);
-              onClose();
+              if (selected) onSave(selected)
+              onClose()
             }}
-            className="flex-1 py-2 px-4 rounded-full font-semibold bg-primary text-ink-invert hover:bg-primary/90 transition"
+            className="flex-1 rounded-full bg-primary py-2 px-4 font-semibold text-ink-invert transition hover:bg-primary/90"
           >
             Save
           </button>
           <button
             onClick={onClose}
-            className="flex-1 py-2 px-4 rounded-full font-semibold border border-border text-ink hover:bg-gray-50 transition"
+            className="flex-1 rounded-full border border-border py-2 px-4 font-semibold text-ink transition hover:bg-gray-50"
           >
             Cancel
           </button>
         </div>
       </div>
     </div>
-  );
-};
+  )
+}
 
 // ============================================================================
-// Main Profile Component
+// Main
 // ============================================================================
-
 export default function Profile(): React.ReactElement {
-  const dispatch = useAppDispatch();
-  const { state } = useLocation();
-  const routeState = (state as (AnalyzerRouteState & { notice?: string }) | undefined) ?? undefined;
+  const dispatch = useAppDispatch()
+  const { state } = useLocation()
+  const routeState = (state as (AnalyzerRouteState & { notice?: string }) | undefined) ?? undefined
+
+  // Root container for PDF export
+  const exportRef = useRef<HTMLDivElement | null>(null)
 
   // Redux source
-  const analyzer = useSelector((s: RootState) => s.analyzer);
-  const notice = routeState?.notice;
+  const analyzer = useSelector((s: RootState) => s.analyzer)
+  const notice = routeState?.notice
 
-  // Tutorial state
-  const [showTutorial, setShowTutorial] = useState(false);
-  const tutorialSteps: TutorialStep[] = useMemo(() => getProfileTutorialSteps(), []);
-
-  // One-time hydration from route state when Redux is empty
+  // One-time hydration from route state
   useEffect(() => {
-    if (!routeState) return;
-
+    if (!routeState) return
     if (!analyzer.chosenRoles?.length && routeState.roles?.length) {
-      dispatch(setChosenRoles(normalizeRoles(routeState.roles)));
+      dispatch(setChosenRoles(normalizeRoles(routeState.roles)))
     }
     if (!analyzer.chosenAbilities?.length && routeState.abilities?.length) {
-      dispatch(setChosenAbilities(routeState.abilities));
+      dispatch(setChosenAbilities(routeState.abilities))
     }
     if (
       (!analyzer.interestedIndustryCodes || analyzer.interestedIndustryCodes.length === 0) &&
       routeState.industries?.length
     ) {
-      dispatch(setInterestedIndustryCodes(routeState.industries));
+      dispatch(setInterestedIndustryCodes(routeState.industries))
     }
     if (!analyzer.preferredRegion && routeState.region) {
-      dispatch(setPreferredRegion(routeState.region));
+      dispatch(setPreferredRegion(routeState.region))
     }
     if (!analyzer.selectedJob && routeState.selectedJob) {
-      const normalized = normalizeSelectedJob(routeState.selectedJob);
-      if (normalized) dispatch(setSelectedJob(normalized));
+      const normalized = normalizeSelectedJob(routeState.selectedJob)
+      if (normalized) dispatch(setSelectedJob(normalized))
     }
     if (!analyzer.trainingAdvice && routeState.training) {
-      dispatch(setTrainingAdvice(routeState.training));
+      dispatch(setTrainingAdvice(routeState.training))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // run once
+  }, []) // once
 
-  // Career choice value for panel
+  // Career choice value
   const careerChoiceValue = useMemo((): CareerChoiceState => {
-    const pastJobsRedux = normalizeRoles(analyzer.chosenRoles);
-    const targetJobRedux = normalizeSelectedJob(analyzer.selectedJob);
-    const regionRedux = analyzer.preferredRegion || "";
+    const pastJobsRedux = normalizeRoles(analyzer.chosenRoles)
+    const targetJobRedux = normalizeSelectedJob(analyzer.selectedJob)
+    const regionRedux = analyzer.preferredRegion || ""
 
-    const pastJobsRoute = normalizeRoles(routeState?.roles);
-    const targetJobRoute = normalizeSelectedJob(routeState?.selectedJob);
-    const regionRoute = routeState?.region || "";
+    const pastJobsRoute = normalizeRoles(routeState?.roles)
+    const targetJobRoute = normalizeSelectedJob(routeState?.selectedJob)
+    const regionRoute = routeState?.region || ""
 
-    const pastJobs = pastJobsRedux.length > 0 ? pastJobsRedux : pastJobsRoute;
+    const pastJobs = pastJobsRedux.length > 0 ? pastJobsRedux : pastJobsRoute
+    const targetJobSource = targetJobRedux ?? targetJobRoute
+    const targetJob = targetJobSource ? { id: targetJobSource.code, title: targetJobSource.title } : null
 
-    const targetJobSource = targetJobRedux ?? targetJobRoute;
-    const targetJob = targetJobSource
-      ? { id: targetJobSource.code, title: targetJobSource.title }
-      : null;
+    return { pastJobs, targetJob, region: regionRedux || regionRoute }
+  }, [analyzer, routeState])
 
-    return { pastJobs, targetJob, region: regionRedux || regionRoute };
-  }, [analyzer, routeState]);
-
-  // Persist panel changes back to Redux
+  // Persist panel changes
   const onCareerChoiceChange = (next: CareerChoiceState): void => {
-    dispatch(setChosenRoles(normalizeRoles(next.pastJobs)));
-    const targetJobForRedux = next.targetJob
-      ? { code: next.targetJob.id, title: next.targetJob.title }
-      : null;
-    dispatch(setSelectedJob(targetJobForRedux));
-    dispatch(setPreferredRegion(next.region));
-  };
+    dispatch(setChosenRoles(normalizeRoles(next.pastJobs)))
+    const targetJobForRedux = next.targetJob ? { code: next.targetJob.id, title: next.targetJob.title } : null
+    dispatch(setSelectedJob(targetJobForRedux))
+    dispatch(setPreferredRegion(next.region))
+  }
 
-  // Auto-fetch training advice on target-job change
-  const selectedJobCode = analyzer.selectedJob?.code ?? "";
-  const selectedJobTitle = analyzer.selectedJob?.title ?? "";
+  // Training advice fetch
+  const selectedJobCode = analyzer.selectedJob?.code ?? ""
+  const selectedJobTitle = analyzer.selectedJob?.title ?? ""
   const {
     data: trainingData,
     isFetching: trainingFetching,
     isError: trainingError,
-  } = useTrainingAdvice(selectedJobCode);
-
-  // Persist training advice to Redux when fetched
-  useEffect(() => {
-    if (!trainingData || trainingFetching || trainingError) return;
-    const mapped = mapAdviceResToState(trainingData, {
-      code: selectedJobCode,
-      title: selectedJobTitle,
-    });
-    dispatch(setTrainingAdvice(mapped));
-  }, [trainingData, trainingFetching, trainingError, selectedJobCode, selectedJobTitle, dispatch]);
+  } = useTrainingAdvice(selectedJobCode)
 
   useEffect(() => {
-    console.log("[Profile] Redux unmatched buckets:", analyzer.selectedJobUnmatched);
-    console.log("[Profile] Route unmatched buckets:", routeState?.unmatched);
-  }, [analyzer.selectedJobUnmatched, routeState?.unmatched]);
+    if (!trainingData || trainingFetching || trainingError) return
+    const mapped = mapAdviceResToState(trainingData, { code: selectedJobCode, title: selectedJobTitle })
+    dispatch(setTrainingAdvice(mapped))
+  }, [trainingData, trainingFetching, trainingError, selectedJobCode, selectedJobTitle, dispatch])
 
-  // Training items for display
+  // Training items
   const trainingItems: TrainingAdvice[] = useMemo(() => {
-    const courses = analyzer.trainingAdvice?.courses ?? [];
+    const courses = analyzer.trainingAdvice?.courses ?? []
     return courses.map((c) => ({
       title: c.name ?? c.id,
       code: c.id,
       url: c.url ?? fallbackCourseUrl(c.id),
-    }));
-  }, [analyzer.trainingAdvice]);
+    }))
+  }, [analyzer.trainingAdvice])
 
-  // Occupation search state
-  const [industryCode, setIndustryCode] = useState("");
-  const [keyword, setKeyword] = useState("");
-  const [searchParams, setSearchParams] = useState<SearchParams>(null);
-
-  const { data: searchDataRaw, isFetching, isError } = useAnzscoSearch(searchParams);
-
-  const normalizedResults: AnzscoOccupation[] = useMemo(() => {
-    return Array.isArray(searchDataRaw) ? searchDataRaw : [];
-  }, [searchDataRaw]);
+  // Search block
+  const [industryCode, setIndustryCode] = useState("")
+  const [keyword, setKeyword] = useState("")
+  const [searchParams, setSearchParams] = useState<SearchParams>(null)
+  const { data: searchDataRaw, isFetching, isError } = useAnzscoSearch(searchParams)
+  const normalizedResults: AnzscoOccupation[] = useMemo(
+    () => (Array.isArray(searchDataRaw) ? searchDataRaw : []),
+    [searchDataRaw]
+  )
 
   const occupationSearch: OccupationSearchInputs = {
-    industryOptions: industryOptions.map((opt) => ({
-      value: opt.value,
-      label: opt.label,
-    })),
+    industryOptions: industryOptions.map((opt) => ({ value: opt.value, label: opt.label })),
     industryCode,
     onIndustryChange: setIndustryCode,
     keyword,
     onKeywordChange: setKeyword,
     onSearch: () => {
-      const industryName = industryNameOf(industryCode) ?? "";
+      const industryName = industryNameOf(industryCode) ?? ""
       if (industryName || keyword.trim()) {
-        setSearchParams({
-          industry: industryName,
-          keyword: keyword.trim(),
-          limit: 20,
-        });
+        setSearchParams({ industry: industryName, keyword: keyword.trim(), limit: 20 })
       }
     },
     results: normalizedResults,
     isFetching,
     isError,
     noResults: !isFetching && normalizedResults.length === 0,
-  };
+  }
 
-  // SkillRoadMap initial skills from UNMATCHED ONLY
-  const unmatchedRedux = analyzer.selectedJobUnmatched;
-  const unmatchedRoute = routeState?.unmatched ?? null;
+  // Unmatched-only abilities -> roadmap
+  const unmatchedRedux = analyzer.selectedJobUnmatched
+  const unmatchedRoute = routeState?.unmatched ?? null
   const abilitiesFromUnmatched = useMemo(() => {
-    const source = unmatchedRedux ?? unmatchedRoute ?? null;
-    return uniqueAbilities(collapseUnmatchedBuckets(source));
-  }, [unmatchedRedux, unmatchedRoute]);
+    const source = unmatchedRedux ?? unmatchedRoute ?? null
+    return uniqueAbilities(collapseUnmatchedBuckets(source))
+  }, [unmatchedRedux, unmatchedRoute])
 
   const initialRoadmap = useMemo(() => {
-    const items = dedupeRoadmapItems(toSkillRoadmapItems(abilitiesFromUnmatched));
-    const key = `unmatched:${items.length}`;
-    return { key, items };
-  }, [abilitiesFromUnmatched]);
+    const items = dedupeRoadmapItems(toSkillRoadmapItems(abilitiesFromUnmatched))
+    const key = `unmatched:${items.length}`
+    return { key, items }
+  }, [abilitiesFromUnmatched])
 
-  // Scroll helper for VET glossary
-  const vetTerminologyRef = useRef<HTMLDivElement>(null);
+  // Glossary scroll anchor
+  const vetTerminologyRef = useRef<HTMLDivElement>(null)
+
+  // Export whole page
+  const onExportPdf = async (): Promise<void> => {
+    if (!exportRef.current) return
+    const code = analyzer.selectedJob?.code ? `_${analyzer.selectedJob.code}` : ""
+    const fileName = `Profile${code}.pdf`
+    await exportElementToPdf(exportRef.current, fileName)
+  }
 
   return (
-    <>
-      {/* Profile Header with centered title and tutorial button in top-right */}
-      <div
-        id="profile-header"
-        className="relative bg-white px-4 sm:px-6 lg:px-8 py-12"
-      >
-        {/* Tutorial Button - Top Right Corner */}
-        <div className="absolute top-4 right-4 sm:top-6 sm:right-8">
-          <button
-            onClick={() => setShowTutorial(true)}
-            className="inline-flex items-center gap-2 px-5 py-3 bg-white text-primary border-2 border-primary text-sm font-semibold rounded-full shadow-lg hover:bg-primary hover:text-white transition-all duration-200"
-            aria-label="View Profile Tutorial"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <span className="hidden sm:inline">View Tutorial</span>
-            <span className="sm:hidden">Tutorial</span>
-          </button>
+    // Whole page container for PDF export
+    <div id="profile-export-root" ref={exportRef}>
+      {/* Header with centered title and top-right tutorial (original position) */}
+      <div id="profile-header" className="relative bg-white px-4 py-12 sm:px-6 lg:px-8">
+        {/* View Tutorial pinned to header top-right */}
+        <div className="absolute right-4 top-4 sm:right-8 sm:top-6">
+          <TutorialLauncher
+            steps={() => getProfileTutorialSteps()}
+            placement="top-right"
+            label="View Tutorial"
+            variant="outline"
+          />
         </div>
 
-        {/* Centered Title with Help Toggle beside it */}
-        <div className="max-w-7xl mx-auto text-center">
-          <div className="flex items-center justify-center gap-2 mb-3">
-            <h1 className="text-3xl sm:text-4xl font-bold text-slate-900">Profile</h1>
+        <div className="mx-auto max-w-7xl text-center">
+          <div className="mb-3 flex items-center justify-center gap-2">
+            <h1 className="text-3xl font-bold text-slate-900 sm:text-4xl">Profile</h1>
             <HelpToggleSmall
               placement="bottom"
               openOn="both"
               text={
                 <>
                   <p className="mb-2">
-                    <strong>Career Intent:</strong> Define your past roles,
-                    target job, and preferred location.
+                    <strong>Career Intent:</strong> Define your past roles, target job, and preferred location.
                   </p>
                   <p className="mb-2">
-                    <strong>Skill Roadmap:</strong> Focus on abilities you're
-                    currently missing. Add target dates to plan your learning.
+                    <strong>Skill Roadmap:</strong> Focus on abilities you're currently missing. Add target dates.
                   </p>
                   <p className="mb-2">
-                    <strong>Training Advice:</strong> Discover relevant VET
-                    courses mapped to your target occupation. Remove courses
-                    that don't fit.
+                    <strong>Training Advice:</strong> Discover relevant VET courses mapped to your target occupation.
                   </p>
                   <p>
-                    <strong>VET Glossary:</strong> Look up unfamiliar course
-                    terminology before enrolling.
+                    <strong>VET Glossary:</strong> Look up unfamiliar course terminology before enrolling.
                   </p>
                 </>
               }
             />
           </div>
-
-          <p className="text-base sm:text-lg text-slate-700 max-w-3xl mx-auto">
-            Organize your career intent, track your skill development roadmap,
-            and discover relevant training opportunities. Build a clear path
-            toward your target role.
+          <p className="mx-auto max-w-3xl text-base text-slate-700 sm:text-lg">
+            Organize your career intent, track your skill development roadmap, and discover relevant training opportunities.
           </p>
-
           {notice && (
             <div className="mt-4 inline-block rounded-lg border border-green-300 bg-green-50 p-4 text-sm text-green-800">
               {notice}
@@ -576,10 +508,24 @@ export default function Profile(): React.ReactElement {
       </div>
 
       {/* Main Content */}
-      <div className="px-4 sm:px-6 lg:px-8 py-12 max-w-7xl mx-auto space-y-8">
+      <div className="mx-auto max-w-7xl space-y-8 px-4 py-12 sm:px-6 lg:px-8">
         {/* Career Intent Section */}
-        <section id="career-intent">
-          <h2 className="text-2xl font-heading font-bold text-ink mb-4">Career Intent</h2>
+        <section id="career-intent" className="relative">
+          {/* Export PDF near Career Intent, below top edge, right aligned */}
+          <div className="absolute right-0 -top-6 sm:-top-8">
+            <button
+              onClick={onExportPdf}
+              className="inline-flex items-center gap-2 rounded-full border-2 border-primary bg-white px-4 py-2 text-sm font-semibold text-primary shadow-lg transition-all hover:bg-primary hover:text-white"
+              aria-label="Export this page as PDF"
+            >
+              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M6 9V4h12v5M6 18H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-1M6 14h12v8H6v-8Z" />
+              </svg>
+              <span>Export PDF</span>
+            </button>
+          </div>
+
+          <h2 className="mb-4 text-2xl font-heading font-bold text-ink">Career Intent</h2>
           <CareerChoicePanel
             value={careerChoiceValue}
             onChange={onCareerChoiceChange}
@@ -591,39 +537,25 @@ export default function Profile(): React.ReactElement {
 
         {/* Skill Roadmap Section */}
         <section id="skill-roadmap">
-          <div className="flex items-center justify-between mb-4">
+          <div className="mb-4 flex items-center justify-between">
             <h2 className="text-2xl font-heading font-bold text-ink">Skill Roadmap</h2>
             <HelpToggleSmall
               placement="left"
               openOn="both"
               text={
                 <div>
-                  <div className="font-semibold text-primary mb-1">Heads-up</div>
+                  <div className="mb-1 font-semibold text-primary">Heads-up</div>
                   <p>
-                    We list only <strong>missing abilities</strong> detected for your selected job.
-                    You can also <strong>customize</strong> this list manually at any time.
+                    We list only <strong>missing abilities</strong> detected for your selected job. You can{" "}
+                    <strong>customize</strong> this list at any time.
                   </p>
                 </div>
               }
             />
           </div>
 
-          {initialRoadmap.items.length === 0 && (
-            <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 p-4 text-blue-900">
-              <p className="mb-3">
-                Not sure what you want to do next? You can take the analyzer test to get some ideas.
-              </p>
-              <Link
-                to="/analyzer"
-                className="inline-flex items-center justify-center rounded-full bg-primary px-4 py-2 font-semibold text-white hover:bg-primary/90"
-              >
-                Take the test
-              </Link>
-            </div>
-          )}
-
-          <div className="rounded-xl border border-border p-6 bg-white shadow-card">
-            <p className="text-sm text-ink-soft mb-4">
+          <div className="rounded-xl border border-border bg-white p-6 shadow-card">
+            <p className="mb-4 text-sm text-ink-soft">
               Plan your skill development journey with timelines for each skill you want to acquire.
             </p>
             <SkillRoadMap key={initialRoadmap.key} initialSkills={initialRoadmap.items} />
@@ -632,48 +564,49 @@ export default function Profile(): React.ReactElement {
 
         {/* Training Advice Section */}
         <section id="training-advice">
-          <h2 className="text-2xl font-heading font-bold text-ink mb-4">Training Advice</h2>
-          <div className="rounded-xl border border-border p-6 bg-white shadow-card">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-2xl font-heading font-bold text-ink">Training Advice</h2>
+            <HelpToggleSmall
+              placement="left"
+              openOn="both"
+              text="This list updates based on the target job you select."
+            />
+          </div>
+
+          <div className="rounded-xl border border-border bg-white p-6 shadow-card">
             <TrainingAdviceList
               items={trainingItems}
               title=""
               onRemove={(item) => {
-                const updated = trainingItems.filter((t) => t.code !== item.code);
+                const updated = trainingItems.filter((t) => t.code !== item.code)
                 dispatch(
                   setTrainingAdvice({
                     occupation: analyzer.trainingAdvice?.occupation || { code: "", title: "" },
                     courses: updated.map((t) => ({ id: t.code, name: t.title, url: t.url })),
                   })
-                );
+                )
               }}
             />
 
             {trainingItems.length > 0 && (
-              <div className="mt-6 pt-6 border-t border-border">
-                <div className="flex items-start gap-3 p-4 rounded-lg bg-blue-50 border border-blue-200">
+              <div className="mt-6 border-t border-border pt-6">
+                <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4">
                   <svg
-                    className="h-5 w-5 text-blue-600 shrink-0 mt-0.5"
+                    className="mt-0.5 h-5 w-5 shrink-0 text-blue-600"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
                     aria-hidden="true"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   <div className="flex-1">
-                    <p className="text-sm text-blue-900 mb-2">
-                      <strong>Confused by course terminology?</strong> Try our VET Terminology Dictionary below to look up unfamiliar terms.
+                    <p className="mb-2 text-sm text-blue-900">
+                      <strong>Confused by course terminology?</strong> Try our VET Terminology Dictionary below.
                     </p>
                     <button
-                      onClick={() =>
-                        vetTerminologyRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
-                      }
-                      className="text-sm font-semibold text-blue-700 hover:text-blue-800 underline transition"
+                      onClick={() => document.getElementById("vet-terminology")?.scrollIntoView({ behavior: "smooth" })}
+                      className="text-sm font-semibold text-blue-700 underline transition hover:text-blue-800"
                     >
                       Go to VET Terminology →
                     </button>
@@ -686,13 +619,10 @@ export default function Profile(): React.ReactElement {
 
         {/* VET Terminology Section */}
         <section id="vet-terminology" ref={vetTerminologyRef}>
-          <h2 className="text-2xl font-heading font-bold text-ink mb-4">VET Terminology</h2>
+          <h2 className="mb-4 text-2xl font-heading font-bold text-ink">VET Terminology</h2>
           <VetGlossarySearch />
         </section>
       </div>
-
-      {/* Tutorial Overlay */}
-      <Tutorial steps={tutorialSteps} isOpen={showTutorial} onClose={() => setShowTutorial(false)} />
-    </>
-  );
+    </div>
+  )
 }

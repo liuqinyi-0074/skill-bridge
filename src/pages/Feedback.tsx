@@ -110,7 +110,6 @@ export default function FeedbackPage() {
       };
 
       const res: FeedbackRes = await sendFeedback(payload);
-      console.log("API Response:", res);
 
       // Discriminated handling:
       if (isFeedbackOk(res)) {

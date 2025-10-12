@@ -6,7 +6,7 @@
 // read from location.state and write back to Redux.
 // English comments only inside code.
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useSelector, shallowEqual } from "react-redux";
 import AnalyzerLayout from "../../layouts/AnalyzerLayout";
@@ -26,7 +26,7 @@ import {
   setInterestedIndustryCodes,
   setPreferredRegion,
 } from "../../store/analyzerSlice";
-import type { AbilityLite, AType, SelectedJob } from "../../store/analyzerSlice";
+import type { AbilityLite, AType, SelectedJob, RoleLite } from "../../store/analyzerSlice";
 import { industryNameOf } from "../../data/industries";
 import type { AnalyzerRouteState } from "../../types/routes";
 
@@ -122,7 +122,7 @@ export default function AnalyzerJobSuggestion(): React.ReactElement {
       industryCodes: s.analyzer.interestedIndustryCodes as string[] | null,
       region: s.analyzer.preferredRegion as string | null,
       storedTarget: s.analyzer.selectedJob as SelectedJob,
-      rolesInStore: s.analyzer.chosenRoles,
+      rolesInStore: s.analyzer.chosenRoles as (RoleLite | string)[],
     }),
     shallowEqual
   );
@@ -156,6 +156,21 @@ export default function AnalyzerJobSuggestion(): React.ReactElement {
     }
     return out;
   }, [abilities]);
+
+  // Codes the user already selected in previous steps; filter them out of suggestions
+  const excludedRoleCodes = useMemo(() => {
+    const set = new Set<string>();
+    (rolesInStore ?? []).forEach((role) => {
+      if (typeof role === "string") {
+        const code = role.trim();
+        if (code) set.add(code);
+      } else if (role && typeof role === "object") {
+        const code = role.id?.trim() ?? "";
+        if (code) set.add(code);
+      }
+    });
+    return set;
+  }, [rolesInStore]);
 
   // Resolve full industry names from chosen codes; de-duplicate
   const industries = useMemo(() => {
@@ -202,52 +217,75 @@ export default function AnalyzerJobSuggestion(): React.ReactElement {
   }, [allCodes, selected, dispatch]);
 
   // Toggle pick and write-through to Redux so other steps see it
-  const handlePick = (code: string, title: string) => {
-    const next = selected?.code === code ? null : { code, title };
-    setSelected(next);
-    dispatch(setSelectedJob(next));
-    if (!next) {
-      dispatch(setSelectedJobUnmatched(null));
-    }
-  };
+  const handlePick = useCallback(
+    (code: string, title: string) => {
+      setSelected((prev) => {
+        const next = prev?.code === code ? null : { code, title };
+        dispatch(setSelectedJob(next));
+        if (!next) {
+          dispatch(setSelectedJobUnmatched(null));
+        }
+        return next;
+      });
+    },
+    [dispatch]
+  );
 
   // Build data for the split JobSuggestion component
   const splitData = useMemo(() => {
-    return many.list.map((one) => {
-      const items = (one.data?.items ?? []) as OccupationGroupItem[];
-      return {
-        key: one.industry,
-        title: one.industry,
-        groupCount: items.length,
-        groups: items.map((g) => ({
-          id: g.occupation_code,
-          title: g.occupation_title,
-          jobsCount: g.anzsco.length,
-          avgMatch: typeof g.matchPct === "number" ? g.matchPct : undefined,
-          collapsible: true,
-          defaultOpen: false,
-          children: (
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              {g.anzsco.map((z) => {
-                const chosen = selected?.code === z.code;
-                return (
-                  <InlineDemandCard
-                    key={z.code}
-                    code={z.code}
-                    title={z.title}
-                    description={z.description ?? ""}
-                    region={region}
-                    selected={Boolean(chosen)}
-                    onSelect={() => handlePick(z.code, z.title)}
-                  />
-                );
-              })}
-            </div>
-          ),
-        })),
-      };
-    });
-  }, [many.list, region, selected]);
+    return many.list
+      .map((one) => {
+        const items = (one.data?.items ?? []) as OccupationGroupItem[];
+
+        const groups = items
+          .map((g) => {
+            const visibleJobs = g.anzsco.filter((job) => {
+              const code = job.code?.trim() ?? "";
+              return code && !excludedRoleCodes.has(code);
+            });
+
+            if (visibleJobs.length === 0) return null;
+
+            return {
+              id: g.occupation_code,
+              title: g.occupation_title,
+              jobsCount: visibleJobs.length,
+              avgMatch: typeof g.matchPct === "number" ? g.matchPct : undefined,
+              collapsible: true,
+              defaultOpen: false,
+              children: (
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                  {visibleJobs.map((job) => {
+                    const chosen = selected?.code === job.code;
+                    return (
+                      <InlineDemandCard
+                        key={job.code}
+                        code={job.code}
+                        title={job.title}
+                        description={job.description ?? ""}
+                        region={region}
+                        selected={Boolean(chosen)}
+                        onSelect={() => handlePick(job.code, job.title)}
+                      />
+                    );
+                  })}
+                </div>
+              ),
+            };
+          })
+          .filter((g): g is NonNullable<typeof g> => Boolean(g));
+
+        if (groups.length === 0) return null;
+
+        return {
+          key: one.industry,
+          title: one.industry,
+          groupCount: groups.length,
+          groups,
+        };
+      })
+      .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
+  }, [many.list, region, selected, excludedRoleCodes, handlePick]);
 
   // On Next: persist unmatched buckets for the selected job only (support both shapes)
   const handleNext = () => {
@@ -273,8 +311,6 @@ export default function AnalyzerJobSuggestion(): React.ReactElement {
     }
 
     // Debug: inspect unmatched buckets before persisting
-    console.log("[AnalyzerJobSuggestion] Computed unmatched buckets:", unmatched);
-
     dispatch(setSelectedJobUnmatched(unmatched));
     goNext();
   };

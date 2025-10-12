@@ -62,6 +62,7 @@ const NAV_ITEM_FOCUS =
 const NAV_ITEM_HOVER =
   "hover:underline hover:decoration-1 hover:decoration-dashed hover:decoration-primary/60 hover:underline-offset-[6px]";
 const NAV_ITEMS = [
+  { label: "Home", to: "/" },
   { label: "Analyzer", to: "/analyzer" },
   { label: "Insight", to: "/insight" },
   { label: "Profile", to: "/profile" },

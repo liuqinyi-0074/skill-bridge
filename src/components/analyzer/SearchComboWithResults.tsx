@@ -32,13 +32,7 @@ export type SearchComboWithResultsProps = {
   addDisabledReason?: string;
 };
 
-const CARD_BODY_MAX_H = 96; // px; keep cards visually same height when collapsed
-
-/** Cheap check: long description probably needs a toggle */
-function descNeedsToggle(desc: string): boolean {
-  // If over ~140 chars or contains more than 3 lines worth of words, show the chevron
-  return desc.trim().length > 140;
-}
+const CARD_BODY_MAX_H = 96; // px
 
 const SearchComboWithResults: React.FC<SearchComboWithResultsProps> = ({
   industryOptions,
@@ -59,21 +53,22 @@ const SearchComboWithResults: React.FC<SearchComboWithResultsProps> = ({
   selectedCount,
   addDisabledReason,
 }) => {
-  /** Track which cards are expanded (keyed by occupation code) */
+  /** 哪些卡片已展开 */
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  /** 哪些卡片描述会溢出，需要切换按钮 */
+  const [overflow, setOverflow] = useState<Record<string, boolean>>({});
 
-  /** True when user selected the max number of roles */
   const reachedCap = selectedCount >= maxSelectable;
 
-  /** English-only input validator: allow empty, letters, spaces, apostrophes, hyphens */
   const trimmed = keyword.trim();
   const englishOk = trimmed === "" || /^[A-Za-z][A-Za-z\s'-]*$/.test(trimmed);
 
-  /** Toggle one card’s expanded state */
-  const toggleExpand = (code: string): void =>
-    setExpanded((p) => ({ ...p, [code]: !p[code] }));
+  const makeMeasureRef = (code: string) => (el: HTMLDivElement | null) => {
+    if (!el) return;
+    const need = el.scrollHeight > CARD_BODY_MAX_H + 1;
+    setOverflow((p) => (p[code] === need ? p : { ...p, [code]: need }));
+  };
 
-  /** Placeholder placed on top once, so the select starts empty */
   const industryOptionsWithPlaceholder = useMemo<Option[]>(
     () => [{ value: "", label: "Select an industry…" }, ...industryOptions],
     [industryOptions]
@@ -120,7 +115,6 @@ const SearchComboWithResults: React.FC<SearchComboWithResultsProps> = ({
             onClick={onSearch}
             aria-label="Search roles"
             disabled={!englishOk}
-            /* Show instant tooltip when disabled */
             tooltipWhenDisabled={!englishOk ? "Please enter English letters only." : undefined}
           >
             Search roles
@@ -128,15 +122,15 @@ const SearchComboWithResults: React.FC<SearchComboWithResultsProps> = ({
         </div>
       </div>
 
-      {/* Validation or helper messages */}
+      {/* Error messages: 默认不显示，只有出错条件下渲染 */}
       {!englishOk && (
-        <div className="mt-3 rounded-md bg-amber-50 text-amber-900 p-3 text-sm">
+        <div className="mt-3 rounded-md bg-red-50 text-red-900 p-3 text-sm">
           Please enter English letters only.
         </div>
       )}
 
       {searchError && (
-        <div className="mt-3 rounded-md bg-amber-50 text-amber-800 p-3 text-sm">
+        <div className="mt-3 rounded-md bg-red-50 text-red-900 p-3 text-sm">
           {searchError}
         </div>
       )}
@@ -153,12 +147,7 @@ const SearchComboWithResults: React.FC<SearchComboWithResultsProps> = ({
       {isError && (
         <div className="mt-3 rounded-md bg-red-50 text-red-900 p-3 text-sm">
           Our system may be having an issue right now. Please try again later or{" "}
-          <a
-            href="/feedback"
-            className="underline underline-offset-2 font-medium"
-            target="_blank"
-            rel="noreferrer"
-          >
+          <a href="/feedback" className="underline underline-offset-2 font-medium" target="_blank" rel="noreferrer">
             send feedback
           </a>
           .
@@ -167,24 +156,24 @@ const SearchComboWithResults: React.FC<SearchComboWithResultsProps> = ({
 
       {noResults && englishOk && !isFetching && (
         <div className="mt-3 rounded-md bg-blue-50 text-blue-900 p-3 text-sm">
-          This industry does not contain roles matching your keyword. Please verify your input or try a different industry.
+          This industry does not contain roles matching your keyword. Please verify your input or try a different
+          industry.
         </div>
       )}
 
       {isFetching && <div className="mt-3 text-sm text-ink-soft">Searching…</div>}
 
-      {/* Results grid: equal-height cards */}
+      {/* Results grid */}
       <ul className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
         {results.map((it) => {
           const picked = pickedIds.includes(it.code);
           const disableAdd = reachedCap && !picked;
 
-          // Safely coerce optional description
           const rawDesc = (it as { description?: unknown }).description;
           const desc: string = typeof rawDesc === "string" ? rawDesc : "";
           const hasDesc = desc.trim().length > 0;
           const expandedNow = Boolean(expanded[it.code]);
-          const showToggle = hasDesc && descNeedsToggle(desc);
+          const showToggle = hasDesc && (overflow[it.code] ?? false); // 仅溢出时显示箭头
 
           return (
             <li key={it.code} className="h-full">
@@ -216,31 +205,25 @@ const SearchComboWithResults: React.FC<SearchComboWithResultsProps> = ({
                           aria-label="Add role"
                           tooltipWhenDisabled={
                             disableAdd
-                              ? (addDisabledReason ??
-                                `Limit reached: maximum ${maxSelectable} roles. Remove one before adding.`)
+                              ? addDisabledReason ??
+                                `Limit reached: maximum ${maxSelectable} roles. Remove one before adding.`
                               : undefined
                           }
                         >
                           Add
                         </Button>
                       ) : (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => onRemove(it.code)}
-                          aria-label="Remove role"
-                        >
+                        <Button variant="ghost" size="sm" onClick={() => onRemove(it.code)} aria-label="Remove role">
                           Remove
                         </Button>
                       )}
                     </div>
                   </div>
 
-                  {/* Description block with equal-height behavior */}
                   {hasDesc && (
                     <div className="relative mt-2">
-                      {/* When collapsed: clamp by max height and hide overflow */}
                       <div
+                        ref={makeMeasureRef(it.code)}
                         className={`text-xs leading-5 text-ink-soft break-words whitespace-normal ${
                           expandedNow ? "" : "max-h-[96px] overflow-hidden"
                         }`}
@@ -249,27 +232,19 @@ const SearchComboWithResults: React.FC<SearchComboWithResultsProps> = ({
                         {desc}
                       </div>
 
-                      {/* Gradient fade when collapsed to hint more content */}
                       {!expandedNow && showToggle && (
                         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-white to-transparent" />
                       )}
 
-                      {/* Chevron toggle only when content is long */}
                       {showToggle && (
                         <button
                           type="button"
-                          onClick={() => toggleExpand(it.code)}
-                          className="absolute right-0 -bottom-2 translate-y-full rounded-full p-1 text-ink-soft hover:text-ink"
+                          onClick={() => setExpanded((p) => ({ ...p, [it.code]: !p[it.code] }))}
+                          className="absolute right-0 bottom-1 translate-y-0 rounded-full p-1 text-ink-soft hover:text-ink"
                           aria-label={expandedNow ? "Collapse" : "Expand to view all"}
                           title={expandedNow ? "Collapse" : "View full description"}
                         >
-                          {/* Simple chevron icon */}
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            viewBox="0 0 24 24"
-                            fill="currentColor"
-                            className="h-5 w-5"
-                          >
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
                             {expandedNow ? (
                               <path d="M7.41 15.41 12 10.83l4.59 4.58L18 14l-6-6-6 6z" />
                             ) : (
