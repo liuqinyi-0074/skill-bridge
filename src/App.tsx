@@ -4,6 +4,10 @@ import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import MainLayout from "./layouts/MainLayout";
 import ErrorBoundary from "./components/common/ErrorBoundary";
 import AnalyzerEntry from "./pages/Analyzer/AnalyzerEntry";
+import { useAppDispatch } from "./store/hooks";
+import { resetAnalyzer } from "./store/analyzerSlice";
+
+// Lazy load components without type assertions to avoid conflicts
 const Home = lazy(() => import("./pages/Home"));
 const Insight = lazy(() => import("./pages/Insight"));
 const Profile = lazy(() => import("./pages/Profile"));
@@ -11,7 +15,6 @@ const Feedback = lazy(() => import("./pages/Feedback"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const Terms = lazy(() => import("./pages/Terms"));
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
-
 
 function Spinner() {
   return (
@@ -27,10 +30,30 @@ function Spinner() {
 
 export default function App() {
   const { pathname, hash } = useLocation();
+  const dispatch = useAppDispatch();
+
+  // Scroll to top on route change (except when using hash links)
   useEffect(() => {
     if (hash) return;
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
   }, [pathname, hash]);
+
+  // Auto-cleanup: Clear all data when page closes or refreshes
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // Clear Redux state
+      dispatch(resetAnalyzer());
+
+    };
+
+    // Listen for page close/refresh
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    // Cleanup event listener on unmount
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [dispatch]);
 
   return (
     <ErrorBoundary feedbackHref="/feedback" onError={(e) => console.error(e)}>
