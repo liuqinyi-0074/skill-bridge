@@ -1,24 +1,28 @@
-// src/pages/analyzer/AnalyzerGetInfo.tsx
-// Uses AnalyzerLayout header (Title + HelpToggle) and ProgressBar + SummaryDock.
-// - Search API requires the industry's FULL NAME; we map code/slug → name.
-// - Re-search always refetches even with the same params.
-// - Next enabled only when all three questions are completed.
-// - On Next, persist to Redux and pass router state as fallback to the next step.
-// - Cap selected roles to MAX_ROLES with tooltip and helper messages.
+// src/pages/Analyzer/AnalyzerGetInfo.tsx
+// Get Info step for the Analyzer wizard
+// - Uses AnalyzerLayout header (Title + HelpToggle) and ProgressBar + SummaryDock
+// - Search API requires the industry's FULL NAME; we map code/slug → name
+// - Re-search always refetches even with the same params
+// - Next enabled only when all three questions are completed
+// - On Next, persist to Redux and pass router state as fallback to the next step
+// - Cap selected roles to MAX_ROLES with tooltip and helper messages
+// - Validate inputs strictly: industry code and ANZSCO code
+// - Normalize roles before persisting: { id, title }
 
 import { useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useQueryClient } from "@tanstack/react-query";
-
 import ErrorBoundary from "../../components/common/ErrorBoundary";
 import AnalyzerLayout from "../../layouts/AnalyzerLayout";
 import SelectQuestion from "../../components/analyzer/SelectQuestion";
 import Button from "../../components/ui/Button";
 import SearchComboWithResults from "../../components/analyzer/SearchComboWithResults";
+import Tutorial from "../../components/tutorial/Tutorial";
 
 import { useStepNav } from "../../hooks/useRouteStep";
 import { industryOptions, industryNameOf } from "../../data/industries";
 import { AU_STATE_OPTIONS } from "../../data/au-state";
+import { getInfoTutorialSteps } from "../../data/GetInfoTutorialSteps";
 
 import { useAnzscoSearch } from "../../hooks/queries/userAnzscoSearch";
 import type { AnzscoOccupation } from "../../types/domain";
@@ -31,17 +35,59 @@ import {
 import type { RootState } from "../../store";
 import type { AnalyzerRouteState } from "../../types/routes";
 
-// ---- Maximum selected roles allowed on this step ----
+// Maximum selected roles allowed on this step
 const MAX_ROLES = 5;
 
 // Hook param uses industry full name
 type SearchParams = { industry: string; keyword: string; limit?: number } | null;
 
-/** Page body isolated so the route-level ErrorBoundary can wrap it cleanly */
+/** Validate that a string is a supported industry code present in options. */
+function isValidIndustryCode(code: string): boolean {
+  if (!code) return false;
+  return industryOptions.some((opt) => opt.value === code);
+}
+
+/** Validate ANZSCO code (commonly 6 digits). Adjust if your backend differs. */
+function isValidAnzscoCode(code: string): boolean {
+  return typeof code === "string" && /^\d{6}$/.test(code.trim());
+}
+
+/** Normalize any role-like input into { id, title } with de-duplication. */
+function normalizeRoles(
+  roles: Array<{ id?: string; title?: string } | { code?: string; title?: string } | string>
+): Array<{ id: string; title: string }> {
+  const out: Array<{ id: string; title: string }> = [];
+  const seen = new Set<string>();
+  for (const r of roles) {
+    let id = "";
+    let title = "";
+    if (typeof r === "string") {
+      id = r.trim();
+      title = r.trim();
+    } else if ("id" in r && typeof r.id === "string") {
+      id = r.id.trim();
+      title = (r.title ?? r.id).trim();
+    } else if ("code" in r && typeof r.code === "string") {
+      id = r.code.trim();
+      title = (r.title ?? r.code).trim();
+    }
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push({ id, title });
+  }
+  return out;
+}
+
+/** 
+ * Page body isolated so the route-level ErrorBoundary can wrap it cleanly 
+ */
 function PageBody(): React.ReactElement {
   const { goPrev, goNext } = useStepNav();
   const qc = useQueryClient();
   const dispatch = useDispatch();
+
+  // Tutorial state
+  const [showTutorial, setShowTutorial] = useState(false);
 
   // Read persisted selections to hydrate local drafts
   const persisted = useSelector((s: RootState) => s.analyzer);
@@ -69,6 +115,9 @@ function PageBody(): React.ReactElement {
     const k = submittedKeyword.trim();
     if (!k || k.length < 2) return null;
 
+    // Guard: ensure the submitted industry code is still valid
+    if (!isValidIndustryCode(submittedIndustryCode)) return null;
+
     const industryFullName = industryNameOf(submittedIndustryCode);
     if (!industryFullName) return null;
 
@@ -81,12 +130,15 @@ function PageBody(): React.ReactElement {
 
   // Click "Search" → validate + commit snapshot; always refetch even if params unchanged
   const handleSearchClick = (): void => {
-    // Allow searching even if cap reached; user just cannot add more.
     const k = keyword.trim();
-    const industryFullName = industryNameOf(industryCode);
 
+    if (!isValidIndustryCode(industryCode)) {
+      setSearchErr("Please choose a valid industry.");
+      return;
+    }
+    const industryFullName = industryNameOf(industryCode);
     if (!industryFullName) {
-      setSearchErr("Please choose an industry.");
+      setSearchErr("Please choose a valid industry.");
       return;
     }
     if (k.length < 2) {
@@ -109,134 +161,155 @@ function PageBody(): React.ReactElement {
 
   // Add/remove role (id = ANZSCO code; title = occupation title)
   const handleAddRole = (occ: AnzscoOccupation): void => {
+    // Validate the incoming code before accepting
+    if (!isValidAnzscoCode(occ.code)) return;
     if (draftRoles.length >= MAX_ROLES) return; // cap
     setDraftRoles((prev) =>
-      prev.some((x) => x.id === occ.code) ? prev : prev.concat({ id: occ.code, title: occ.title })
+      prev.some((x) => x.id === occ.code) ? prev : [...prev, { id: occ.code, title: occ.title }]
     );
   };
-  const handleRemoveRole = (code: string): void => {
-    setDraftRoles((prev) => prev.filter((x) => x.id !== code));
+  
+  const handleRemoveRole = (id: string): void => {
+    setDraftRoles((prev) => prev.filter((x) => x.id !== id));
   };
 
-  // Guard for Next
+  // Guard for Next button
   const nextBlockers: string[] = useMemo(() => {
     const blocks: string[] = [];
     if (!draftRoles.length) blocks.push("Pick at least 1 role via Search.");
     if (!region) blocks.push("Select a preferred location.");
     if (!interests.length) blocks.push("Select at least 1 interested industry.");
     return blocks;
-  }, [draftRoles.length, region, interests.length]);
+  }, [draftRoles, region, interests]);
 
   const nextDisabled = nextBlockers.length > 0;
 
-  // Persist to Redux and go next with router-state fallback
+  // Persist local drafts to Redux then navigate
   const handleSubmitAndNext = (): void => {
     if (nextDisabled) return;
 
-    const preferred: string | null = region ?? null;
-    const industries: string[] | null = interests.length > 0 ? interests : null;
+    // Filter roles again to ensure only valid ANZSCO codes are stored
+    const cleanedRoles = draftRoles.filter((r) => isValidAnzscoCode(r.id));
+    // Normalize to { id, title } in case older data shape exists
+    const normalized = normalizeRoles(cleanedRoles);
 
-    dispatch(setPreferredRegion(preferred));
-    dispatch(setInterestedIndustryCodes(industries));
-    dispatch(setChosenRoles(draftRoles));
+    dispatch(setChosenRoles(normalized)); // { id, title }[]
+    dispatch(setPreferredRegion(region));
 
+    // Filter interests to only valid industry codes
+    const cleanedInterests = interests.filter(isValidIndustryCode);
+    dispatch(setInterestedIndustryCodes(cleanedInterests));
+
+    // Build route state for fallback
     const state: AnalyzerRouteState = {
-      roles: draftRoles.length ? draftRoles : undefined,
-      region: region || undefined,
-      industries: interests.length ? interests : undefined,
+      roles: normalized,
+      region,
+      industries: cleanedInterests,
     };
 
     goNext(state);
   };
 
-  // Flags for empty-result messaging
-  const noResults = Boolean(
-    !isFetching && !isError && params && Array.isArray(uiResults) && uiResults.length === 0
-  );
+  // Max-roles message
+  const maxMsg =
+    draftRoles.length >= MAX_ROLES
+      ? `You have reached the maximum of ${MAX_ROLES} roles.`
+      : `Select up to ${MAX_ROLES} roles.`;
 
-  // Derived flags for cap
-  const reachedCap = draftRoles.length >= MAX_ROLES;
-  const addDisabledReason =
-    "You have reached the limit of 5 roles. Remove one to add another.";
+  // Calculate noResults based on search state
+  const noResults =
+    !isFetching && !isError && uiResults.length === 0 && submittedKeyword.length >= 2;
 
   return (
     <AnalyzerLayout
-      summaryDrafts={{ region, industryCodes: interests, roles: draftRoles }}
-      title="Tell us about your background"
+      title="Get info"
       helpContent={{
-        title: "What to do on this page",
-        subtitle:
-          "Choose your previous industry, search and pick at least one role, then set a preferred location and interested industries.",
+        title: "How to use this page",
+        subtitle: "Tell us about your career preferences and interests.",
         features: [
-          "Search requires a keyword of at least 2 characters.",
-          "Industry must be selected to enable search.",
-          "Select up to five roles only.",
+          "Search for occupations by industry and keyword (up to 5 selections).",
+          "Choose your preferred work location in Australia.",
+          "Select industries that interest you (multi-select, up to 20).",
         ],
         tips: [
-          "Select at most five roles. Pick the most representative work experiences to avoid unnecessary analysis noise.",
+          "Use the Search function to explore roles; submit selections with the chip.",
+          "Re-search anytime — same params refetch; Remove chips via ×.",
+          <>
+            Click the{" "}
+            <button
+              onClick={() => setShowTutorial(true)}
+              className="text-primary-600 hover:text-primary-700 underline font-medium"
+            >
+              interactive tutorial
+            </button>{" "}
+            to see a guided walkthrough of this page.
+          </>,
+          "Check the summary sidebar on the right to review your current selections at any time.",
+          "Hover over the disabled 'Next' button to see what's required to proceed.",
         ],
       }}
+      summaryDrafts={{
+        region,
+        industryCodes: interests,
+        roles: draftRoles, // { id, title }[]
+      }}
     >
-      {/* Unified form + results */}
-      <SearchComboWithResults
-        industryOptions={industryOptions}
-        industryCode={industryCode}
-        onIndustryChange={setIndustryCode}
-        keyword={keyword}
-        onKeywordChange={setKeyword}
-        onSearch={handleSearchClick}
-        searchError={searchErr}
-        results={uiResults}
-        isFetching={isFetching}
-        isError={isError}
-        noResults={noResults}
-        pickedIds={pickedIds}
-        onAdd={handleAddRole}
-        onRemove={handleRemoveRole}
-        maxSelectable={MAX_ROLES}
-        selectedCount={draftRoles.length}
-        addDisabledReason={addDisabledReason}
-      />
+      {/* Role search (Q1) */}
+      <section className="mt-8" data-section="role-search">
+        <h2 className="text-xl font-semibold text-ink mb-4">
+          1. Which occupation roles are you interested in?
+        </h2>
 
-      {/* Selected roles preview (chips) */}
-      <section className="mt-6">
-        <h3 className="text-sm font-semibold text-ink">
-          Selected roles ({draftRoles.length}/{MAX_ROLES})
-        </h3>
-        {draftRoles.length === 0 ? (
-          <p className="mt-2 text-sm text-ink-soft">Nothing selected yet.</p>
-        ) : (
-          <div className="mt-2 flex flex-wrap gap-2">
+        <SearchComboWithResults
+          industryOptions={industryOptions}
+          industryCode={industryCode}
+          onIndustryChange={setIndustryCode}
+          keyword={keyword}
+          onKeywordChange={setKeyword}
+          onSearch={handleSearchClick}
+          searchError={searchErr}
+          results={uiResults}
+          isFetching={isFetching}
+          isError={isError}
+          noResults={noResults}
+          pickedIds={pickedIds}
+          onAdd={handleAddRole}
+          onRemove={handleRemoveRole}
+          maxSelectable={MAX_ROLES}
+          selectedCount={draftRoles.length}
+          addDisabledReason={`Maximum ${MAX_ROLES} roles can be selected. Remove one before adding another.`}
+        />
+
+        {/* Selected roles as chips */}
+        {draftRoles.length > 0 && (
+          <div className="mt-4 flex flex-wrap gap-2" data-role-chips>
             {draftRoles.map((r) => (
-              <span
+              <div
                 key={r.id}
-                className="inline-flex items-center gap-2 h-8 px-3 rounded-full border border-black/15 bg-black/5 text-sm"
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full
+                           bg-primary-50 text-primary-700 text-sm font-medium
+                           border border-primary-200"
               >
-                {r.title}
+                <span>{r.title}</span>
                 <button
                   type="button"
                   onClick={() => handleRemoveRole(r.id)}
+                  className="text-primary-500 hover:text-primary-700 transition-colors"
                   aria-label={`Remove ${r.title}`}
-                  className="h-5 w-5 grid place-items-center rounded-full border border-black/20 bg-white text-ink hover:bg-black/5 text-xs leading-none"
-
                 >
-                  <span aria-hidden>×</span>
+                  ×
                 </button>
-              </span>
+              </div>
             ))}
           </div>
         )}
-        {reachedCap && (
-          <p className="mt-2 text-xs text-ink-soft">
-            You have selected the maximum of {MAX_ROLES}. Remove one to add another.
-          </p>
-        )}
+
+        <p className="mt-2 text-xs text-slate-600">{maxMsg}</p>
       </section>
 
       {/* Preferred location (single) */}
-      <section className="mt-10">
+      <section className="mt-10" data-section="location">
         <SelectQuestion
-          mode="single"
           title="2. Preferred location (single choice)"
           subtitle="Choose all if you are not sure"
           options={AU_STATE_OPTIONS}
@@ -248,7 +321,7 @@ function PageBody(): React.ReactElement {
       </section>
 
       {/* Interested industries (multi) */}
-      <section className="mt-10">
+      <section className="mt-10" data-section="industries">
         <SelectQuestion
           title="3. Which industries interest you? (multi-select)"
           subtitle=""
@@ -300,12 +373,21 @@ function PageBody(): React.ReactElement {
       {nextDisabled && (
         <p className="mt-2 text-xs text-amber-700">Complete: {nextBlockers.join(" • ")}</p>
       )}
+
+      {/* Tutorial overlay */}
+      <Tutorial
+        steps={getInfoTutorialSteps}
+        isOpen={showTutorial}
+        onClose={() => setShowTutorial(false)}
+      />
     </AnalyzerLayout>
   );
 }
 
+/**
+ * Main component with error boundary wrapper
+ */
 export default function AnalyzerGetInfo(): React.ReactElement {
-  // Route-level boundary isolates failures within this page
   return (
     <ErrorBoundary feedbackHref="/feedback">
       <PageBody />

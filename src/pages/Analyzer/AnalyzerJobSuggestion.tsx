@@ -2,8 +2,8 @@
 // Uses split JobSuggestion card (left industries, right occupation groups).
 // Computes matchPct via hook result and passes into groups.
 // On Next, stores the selected job's unmatched buckets into Redux.
-// Route fallback: if Redux is missing pieces after a refresh/private mode,
-// read them from `location.state` and write back to Redux.
+// Route/cache fallback: if Redux is missing after refresh/private mode,
+// read from location.state and write back to Redux.
 // English comments only inside code.
 
 import { useEffect, useMemo, useState } from "react";
@@ -38,7 +38,6 @@ type AnzscoItem = {
   code: string;
   title: string;
   description?: string | null;
-  // some backends may put unmatched here
   unmatched?: { knowledge: string[]; skill: string[]; tech: string[] };
 };
 
@@ -46,9 +45,8 @@ type AnzscoItem = {
 type OccupationGroupItem = {
   occupation_code: string;
   occupation_title: string;
-  matchPct?: number; // computed in hook select()
+  matchPct?: number;
   anzsco: AnzscoItem[];
-  // some backends may put unmatched at the group level
   unmatched?: { knowledge: string[]; skill: string[]; tech: string[] };
 };
 
@@ -63,23 +61,19 @@ function InlineDemandCard(props: {
 }) {
   const { data, isFetching } = useDemand(props.code, props.region ?? undefined);
 
-  // ----- Safe shortage detection -----
+  // Safe shortage detection
   const nat = (data?.national_rating ?? "").toLowerCase();
   const st = (data?.state_rating ?? "").toLowerCase();
-
   const reNo = /\bno shortage\b|\bnot in shortage\b|\bnot in the shortage list\b|\bnon-shortage\b/;
 
   const natNoShortage = reNo.test(nat);
   const stNoShortage = reNo.test(st);
 
-  // positive shortage but exclude negative phrases
   const nationalShort = /\bshortage\b/.test(nat) && !natNoShortage;
   const stateShort = /\bshortage\b/.test(st) && !stNoShortage;
 
-  // ----- Display text & tone -----
   let text = "";
   let tone: "strong" | "soft" | "default" = "default";
-
   if (stateShort) {
     text = "Shortage";
     tone = "strong";
@@ -88,10 +82,8 @@ function InlineDemandCard(props: {
     tone = "soft";
   } else if (natNoShortage || stNoShortage) {
     text = "Not shortage";
-    tone = "default";
   } else {
     text = "Not in the shortage list";
-    tone = "default";
   }
 
   return (
@@ -113,12 +105,13 @@ function InlineDemandCard(props: {
  * - Split UI: left industries → right occupation groups → role cards grid.
  * - Queries multiple industries in parallel with useRankByCodesMany (each item has matchPct).
  * - Next disabled until a role is selected; selection and unmatched persisted to Redux.
+ * - Fallback: hydrate Redux from route state when store is empty.
  */
-export default function AnalyzerJobSuggestion() {
+export default function AnalyzerJobSuggestion(): React.ReactElement {
   const dispatch = useAppDispatch();
   const { goPrev, goNext } = useStepNav();
 
-  // Route fallback (may carry roles/region/industries/abilities from previous step)
+  // Route/cache fallback (may carry roles/region/industries/abilities from previous step)
   const { state } = useLocation();
   const routeState = (state as AnalyzerRouteState) || undefined;
 
@@ -134,7 +127,7 @@ export default function AnalyzerJobSuggestion() {
     shallowEqual
   );
 
-  // Route → Redux fallback (only fill when missing)
+  // Fallback: write route data into Redux only when missing in store
   useEffect(() => {
     if ((!abilities || abilities.length === 0) && routeState?.abilities?.length) {
       dispatch(setChosenAbilities(routeState.abilities));
@@ -265,13 +258,11 @@ export default function AnalyzerJobSuggestion() {
     for (const one of many.list) {
       const items = (one.data?.items ?? []) as OccupationGroupItem[];
       for (const grp of items) {
-        // case 1: unmatched lives on the group that contains the selected role
         const inGroup = grp.anzsco.some((z) => z.code === selected.code);
         if (inGroup && grp.unmatched) {
           unmatched = grp.unmatched;
           break;
         }
-        // case 2: unmatched lives on the anzsco item itself
         const hit = grp.anzsco.find((z) => z.code === selected.code && z.unmatched);
         if (hit?.unmatched) {
           unmatched = hit.unmatched;
@@ -332,23 +323,16 @@ export default function AnalyzerJobSuggestion() {
         <Button variant="ghost" size="md" onClick={goPrev} aria-label="Go back to previous step">
           Back
         </Button>
-        <div className="tt-group">
-          <Button
-            variant="primary"
-            size="md"
-            onClick={handleNext}
-            disabled={nextDisabled}
-            aria-label={nextDisabled ? "Disabled. Pick a job to continue." : "Go to next step"}
-            title={nextDisabled ? "Pick a job to continue" : "Next"}
-          >
-            Next
-          </Button>
-          {nextDisabled && (
-            <div className="tt-bubble tt--top" role="tooltip">
-              Pick a job to continue.
-            </div>
-          )}
-        </div>
+        <Button
+          variant="primary"
+          size="md"
+          onClick={handleNext}
+          disabled={nextDisabled}
+          aria-label={nextDisabled ? "Disabled. Pick a job to continue." : "Go to next step"}
+          tooltipWhenDisabled="Pick a job to continue."
+        >
+          Next
+        </Button>
       </footer>
     </AnalyzerLayout>
   );

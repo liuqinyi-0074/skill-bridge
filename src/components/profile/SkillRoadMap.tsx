@@ -543,9 +543,9 @@ const SkillRoadMap: React.FC<SkillRoadMapProps> = ({
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between gap-3 sm:gap-4 items-start sm:items-center mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-heading font-bold text-ink">
-            Skill Roadmap
-          </h1>
+          <h3 className="text-xl sm:text-xl lg:text-xl font-heading font-bold text-ink">
+            
+          </h3>
 
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
             {skills.length > 0 && (

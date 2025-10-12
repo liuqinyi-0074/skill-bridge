@@ -1,5 +1,5 @@
 ﻿// src/components/analyzer/SearchComboWithResults.tsx
-import React from "react";
+import React, { useMemo, useState } from "react";
 import type { AnzscoOccupation } from "../../types/domain";
 import Button from "../ui/Button";
 
@@ -32,6 +32,14 @@ export type SearchComboWithResultsProps = {
   addDisabledReason?: string;
 };
 
+const CARD_BODY_MAX_H = 96; // px; keep cards visually same height when collapsed
+
+/** Cheap check: long description probably needs a toggle */
+function descNeedsToggle(desc: string): boolean {
+  // If over ~140 chars or contains more than 3 lines worth of words, show the chevron
+  return desc.trim().length > 140;
+}
+
 const SearchComboWithResults: React.FC<SearchComboWithResultsProps> = ({
   industryOptions,
   industryCode,
@@ -51,26 +59,40 @@ const SearchComboWithResults: React.FC<SearchComboWithResultsProps> = ({
   selectedCount,
   addDisabledReason,
 }) => {
+  /** Track which cards are expanded (keyed by occupation code) */
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+
+  /** True when user selected the max number of roles */
   const reachedCap = selectedCount >= maxSelectable;
 
-  // English-only input validator: allow empty, letters, spaces, apostrophes, hyphens
+  /** English-only input validator: allow empty, letters, spaces, apostrophes, hyphens */
   const trimmed = keyword.trim();
   const englishOk = trimmed === "" || /^[A-Za-z][A-Za-z\s'-]*$/.test(trimmed);
 
+  /** Toggle one card’s expanded state */
+  const toggleExpand = (code: string): void =>
+    setExpanded((p) => ({ ...p, [code]: !p[code] }));
+
+  /** Placeholder placed on top once, so the select starts empty */
+  const industryOptionsWithPlaceholder = useMemo<Option[]>(
+    () => [{ value: "", label: "Select an industry…" }, ...industryOptions],
+    [industryOptions]
+  );
+
   return (
     <section className="mt-2">
-      {/* Form block */}
-      <div className="grid gap-3 sm:grid-cols-[240px_minmax(0,1fr)_auto]">
+      {/* Search form */}
+      <div className="grid gap-3 sm:grid-cols-[300px_minmax(0,1fr)_auto]">
         {/* Industry select */}
         <label className="flex flex-col gap-1">
           <span className="text-sm font-medium">Industry</span>
           <select
-            className="h-10 rounded-lg border border-border px-3"
+            className="h-10 w-full min-w-[260px] rounded-lg border border-border px-3"
             value={industryCode}
             onChange={(e) => onIndustryChange(e.target.value)}
             aria-label="Industry"
           >
-            {industryOptions.map((o) => (
+            {industryOptionsWithPlaceholder.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
               </option>
@@ -98,7 +120,7 @@ const SearchComboWithResults: React.FC<SearchComboWithResultsProps> = ({
             onClick={onSearch}
             aria-label="Search roles"
             disabled={!englishOk}
-            // Instant tooltip when disabled
+            /* Show instant tooltip when disabled */
             tooltipWhenDisabled={!englishOk ? "Please enter English letters only." : undefined}
           >
             Search roles
@@ -151,73 +173,113 @@ const SearchComboWithResults: React.FC<SearchComboWithResultsProps> = ({
 
       {isFetching && <div className="mt-3 text-sm text-ink-soft">Searching…</div>}
 
-      {/* Results grid */}
+      {/* Results grid: equal-height cards */}
       <ul className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
         {results.map((it) => {
           const picked = pickedIds.includes(it.code);
           const disableAdd = reachedCap && !picked;
 
-          // Coerce optional description safely
+          // Safely coerce optional description
           const rawDesc = (it as { description?: unknown }).description;
           const desc: string = typeof rawDesc === "string" ? rawDesc : "";
           const hasDesc = desc.trim().length > 0;
+          const expandedNow = Boolean(expanded[it.code]);
+          const showToggle = hasDesc && descNeedsToggle(desc);
 
           return (
-            <li key={it.code}>
-              {/* Text wraps to fit container */}
-              <article className="h-auto rounded-xl border border-border p-4 shadow-card">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 max-w-full">
-                    {/* Title + code */}
-                    <div className="flex items-start gap-2">
-                      <h4
-                        className="text-sm font-semibold text-ink break-words whitespace-normal leading-5"
-                        title={it.title}
-                      >
-                        {it.title}
-                      </h4>
-                      <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-ink-soft shrink-0">
-                        {it.code}
-                      </span>
+            <li key={it.code} className="h-full">
+              <article className="relative h-full rounded-xl border border-border p-4 shadow-card">
+                <div className="flex h-full flex-col">
+                  {/* Title row */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 max-w-full">
+                      <div className="flex items-start gap-2">
+                        <h4
+                          className="text-sm font-semibold text-ink break-words whitespace-normal leading-5"
+                          title={it.title}
+                        >
+                          {it.title}
+                        </h4>
+                        <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-ink-soft shrink-0">
+                          {it.code}
+                        </span>
+                      </div>
                     </div>
 
-                    {/* Optional description */}
-                    {hasDesc && (
-                      <p className="mt-2 text-xs leading-5 text-ink-soft break-words whitespace-normal">
-                        {desc}
-                      </p>
-                    )}
+                    <div className="shrink-0">
+                      {!picked ? (
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={() => onAdd(it)}
+                          disabled={disableAdd}
+                          aria-label="Add role"
+                          tooltipWhenDisabled={
+                            disableAdd
+                              ? (addDisabledReason ??
+                                `Limit reached: maximum ${maxSelectable} roles. Remove one before adding.`)
+                              : undefined
+                          }
+                        >
+                          Add
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onRemove(it.code)}
+                          aria-label="Remove role"
+                        >
+                          Remove
+                        </Button>
+                      )}
+                    </div>
                   </div>
 
-                  <div className="shrink-0">
-                    {!picked ? (
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={() => onAdd(it)}
-                        disabled={disableAdd}
-                        aria-label="Add role"
-                        // Instant tooltip when disabled by cap
-                        tooltipWhenDisabled={
-                          disableAdd
-                            ? (addDisabledReason ??
-                              `Limit reached: maximum ${maxSelectable} roles. Remove one before adding.`)
-                            : undefined
-                        }
+                  {/* Description block with equal-height behavior */}
+                  {hasDesc && (
+                    <div className="relative mt-2">
+                      {/* When collapsed: clamp by max height and hide overflow */}
+                      <div
+                        className={`text-xs leading-5 text-ink-soft break-words whitespace-normal ${
+                          expandedNow ? "" : "max-h-[96px] overflow-hidden"
+                        }`}
+                        style={!expandedNow ? { maxHeight: CARD_BODY_MAX_H } : undefined}
                       >
-                        Add
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onRemove(it.code)}
-                        aria-label="Remove role"
-                      >
-                        Remove
-                      </Button>
-                    )}
-                  </div>
+                        {desc}
+                      </div>
+
+                      {/* Gradient fade when collapsed to hint more content */}
+                      {!expandedNow && showToggle && (
+                        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-white to-transparent" />
+                      )}
+
+                      {/* Chevron toggle only when content is long */}
+                      {showToggle && (
+                        <button
+                          type="button"
+                          onClick={() => toggleExpand(it.code)}
+                          className="absolute right-0 -bottom-2 translate-y-full rounded-full p-1 text-ink-soft hover:text-ink"
+                          aria-label={expandedNow ? "Collapse" : "Expand to view all"}
+                          title={expandedNow ? "Collapse" : "View full description"}
+                        >
+                          {/* Simple chevron icon */}
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                            className="h-5 w-5"
+                          >
+                            {expandedNow ? (
+                              <path d="M7.41 15.41 12 10.83l4.59 4.58L18 14l-6-6-6 6z" />
+                            ) : (
+                              <path d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
+                            )}
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </article>
             </li>

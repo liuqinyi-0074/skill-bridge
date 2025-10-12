@@ -72,6 +72,7 @@ export default function SelectedSummaryDock({
 
       {/* Dock container (keeps layout hits low by zeroing width when closed) */}
       <aside
+        
         className={clsx(
           "fixed top-0 bottom-0 z-50",
           isLeft ? "left-0" : "right-0",
@@ -112,6 +113,8 @@ export default function SelectedSummaryDock({
       {/* Edge opener, placed on the opposite edge of the panel */}
       {!open && (
         <button
+          data-summary-dock
+        
           type="button"
           onClick={() => setOpen(true)}
           aria-label="Open selections"

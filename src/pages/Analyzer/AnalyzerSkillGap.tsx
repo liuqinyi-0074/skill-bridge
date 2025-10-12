@@ -1,5 +1,7 @@
 // src/pages/Analyzer/AnalyzerSkillGap.tsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+// English comments only inside code.
+
+import React, { useMemo, useRef, useState } from "react";
 import { useSelector } from "react-redux";
 import { useLocation } from "react-router-dom";
 import AnalyzerLayout from "../../layouts/AnalyzerLayout";
@@ -7,51 +9,31 @@ import SkillGap, { type SkillItem } from "../../components/analyzer/SkillGap";
 import Button from "../../components/ui/Button";
 import GlobalError from "../../components/common/GlobalError";
 import type { RootState } from "../../store";
-import { useAppDispatch } from "../../store/hooks";
-import { setSelectedJob, setSelectedJobUnmatched } from "../../store/analyzerSlice";
 import { useStepNav } from "../../hooks/useRouteStep";
 import { exportElementToPdf } from "../../lib/utils/pdf";
 import type { AnalyzerRouteState } from "../../types/routes";
 
 /**
  * AnalyzerSkillGap
- * - Renders the "Skill Gap" step.
- * - Avoids Redux selector warning by not constructing new objects in useSelector.
- * - Falls back to router state once, then writes back to Redux to keep a single source of truth.
+ * - Reads unmatched from Redux; if missing, falls back to route state ONLY.
+ * - Does not write back to Redux.
  * - Allows exporting only the printable region to PDF.
  */
 export default function AnalyzerSkillGap(): React.ReactElement {
   const { goPrev, goNext } = useStepNav();
-  const dispatch = useAppDispatch();
   const printAreaRef = useRef<HTMLDivElement>(null);
   const [hovering, setHovering] = useState(false);
 
-  // Select from Redux separately so each selector returns a stable reference.
-  // Never return a newly created object/array from useSelector.
+  // Read from Redux separately to keep selector stable.
   const unmatchedInStore = useSelector((s: RootState) => s.analyzer.selectedJobUnmatched);
-  const jobInStore = useSelector((s: RootState) => s.analyzer.selectedJob);
 
-  // Router-state fallback from previous step (may be undefined)
+  // Route-state fallback from previous step (may be undefined). Never persisted.
   const routeState = (useLocation().state ?? {}) as AnalyzerRouteState | undefined;
 
-  // Write route fallback back into Redux only when store is missing.
-  // This runs once when landing via navigation with state.
-  useEffect(() => {
-    if (!unmatchedInStore && routeState?.unmatched) {
-      // Persist unmatched payload into Redux
-      dispatch(setSelectedJobUnmatched(routeState.unmatched));
-    }
-    if (!jobInStore && routeState?.selectedJob) {
-      // Persist selected job into Redux
-      dispatch(setSelectedJob(routeState.selectedJob));
-    }
-  }, [dispatch, unmatchedInStore, jobInStore, routeState]);
-
-  // Resolve unmatched source with precedence: store → route → null
+  // Resolve unmatched with precedence: store → route → null
   const unmatched = unmatchedInStore ?? routeState?.unmatched ?? null;
 
   // Collect names from a bucket that may contain strings or objects with common name fields.
-  // Returns a flat string array with empty values removed.
   const collect = (bucket: unknown): string[] => {
     if (!Array.isArray(bucket)) return [];
     return bucket
@@ -78,7 +60,7 @@ export default function AnalyzerSkillGap(): React.ReactElement {
    * - [items]   → render SkillGap with "Missing" status.
    */
   const missingItems: SkillItem[] | undefined = useMemo(() => {
-    if (unmatched == null) return undefined; // no data available
+    if (unmatched == null) return undefined;
     const names = [
       ...collect(unmatched.knowledge),
       ...collect(unmatched.skill),

@@ -13,7 +13,7 @@ import type { RoleLite } from "../../store/analyzerSlice";
 export type CareerChoiceState = {
   pastJobs: RoleLite[];        // Past occupations (up to 5)
   targetJob: RoleLite | null;  // Target occupation (single selection)
-  region: string;              // Region string in English
+  region: string;             
 };
 
 /** Minimal option shape reused by the search combo */

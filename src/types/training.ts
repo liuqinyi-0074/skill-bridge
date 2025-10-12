@@ -14,3 +14,13 @@ export interface TrainingAdviceRes {
   total: number;
   vet_courses: VetCourse[];
 }
+
+/** Normalized course shape used by Redux and UI */
+export interface TrainingCourse {
+  /** Public course code (e.g., TGA code) */
+  id: string;
+  /** Human-friendly course name */
+  name: string;
+  /** Optional details page URL */
+  url?: string;
+}

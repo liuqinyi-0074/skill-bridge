@@ -20,5 +20,5 @@ export interface GlossaryDetail {
 export function getDetailByKeyword(keyword: string): Promise<GlossaryDetail> {
   const kw = keyword.trim();
   if (!kw) throw new Error("Keyword is required");
-  return getJSON<GlossaryDetail>("/api/glossary/detail", { keyword: kw });
+  return getJSON<GlossaryDetail>("/api/glossary/detail", { q: kw });
 }
