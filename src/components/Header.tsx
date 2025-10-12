@@ -27,7 +27,6 @@ type GsapObj = typeof import("gsap")["gsap"];
 type GsapTimeline = ReturnType<GsapObj["timeline"]>;
 type GsapTween = ReturnType<GsapObj["to"]>;
 
-
 // ----- Lazy loaders with module cache -----
 type GSAPModule = typeof import("gsap");
 type STModule = typeof import("gsap/ScrollTrigger");
@@ -214,23 +213,6 @@ const MobileMenu = memo(function MobileMenu({ open, onClose, panelRef, fgClass }
       aria-label="Main menu"
     >
       <div className={clsx("flex flex-col gap-1", NAV_SIZE)}>
-        <NavLink
-          to="/"
-          className={({ isActive }): string =>
-            clsx(
-              NAV_ITEM_BASE,
-              NAV_ITEM_FOCUS,
-              fgClass,
-              isActive ? "border-b-2 border-current" : clsx(NAV_ITEM_HOVER, "hover:bg-white/10"),
-            )
-          }
-          onPointerEnter={(e) => hoverUp(e.currentTarget as HTMLElement)}
-          onPointerLeave={(e) => hoverDown(e.currentTarget as HTMLElement)}
-          onClick={onClose}
-        >
-          <span className="font-bold">Home</span>
-        </NavLink>
-
         {NAV_ITEMS.map((it) => (
           <NavLink
             key={it.to}
