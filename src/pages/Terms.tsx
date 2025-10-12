@@ -22,7 +22,6 @@
  * - No external UI dependencies; works in any React + Tailwind setup.
  */
 
-import React from "react"
 
 type TermsProps = {
   /** Brand or company name shown in the document */
