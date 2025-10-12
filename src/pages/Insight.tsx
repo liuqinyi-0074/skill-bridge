@@ -410,13 +410,7 @@ function InsightInner(): React.ReactElement {
         )}
       </div>
 
-      {/* Tutorial modal - steps reference the section IDs above */}
-      <TutorialLauncher
-        steps={insightTutorialSteps}
-        placement="top-right"
-        label="View Tutorial"
-        variant="outline"
-      />
+
     </>
   )
 }
