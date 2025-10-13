@@ -1,8 +1,4 @@
 // src/components/ui/HelpToggleSmall.tsx
-// Lightweight tooltip component for contextual help
-// Fixed: No more bouncing/flickering on small screens
-// All English comments
-
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import clsx from "clsx";
 import { HelpCircle } from "lucide-react";
@@ -37,7 +33,6 @@ type Props = {
  * - Screen reader accessible with proper ARIA attributes
  * - Flexible interaction modes: hover, click, or both
  * - Smooth animations with Tailwind
- * - Fixed: No infinite re-positioning loops on small screens
  * 
  * @example
  * <HelpToggleSmall
@@ -54,74 +49,83 @@ export default function HelpToggleSmall({
   className,
   hoverDelay = 80,
 }: Props) {
-  // State management
+  /** Controls tooltip visibility */
   const [open, setOpen] = useState<boolean>(false);
+  /** Current placement after viewport boundary adjustments */
   const [adjustedPlacement, setAdjustedPlacement] = useState<Placement>(placement);
   
-  // Refs for DOM manipulation and cleanup
+  /** Timer for delayed hover open */
   const hoverTimerRef = useRef<number | null>(null);
+  /** Root wrapper element */
   const rootRef = useRef<HTMLSpanElement>(null);
+  /** Trigger button element */
   const triggerRef = useRef<HTMLButtonElement>(null);
+  /** Tooltip content element */
   const tooltipRef = useRef<HTMLDivElement>(null);
-  const isAdjustingRef = useRef<boolean>(false); // Prevent infinite adjustment loops
+  /** Flag to prevent position adjustment loops (fixes mobile flicker) */
+  const hasAdjustedRef = useRef<boolean>(false);
   
-  // Unique ID for ARIA relationship
+  /** Unique ID for ARIA relationship between trigger and tooltip */
   const id = useId();
 
   /**
    * Smart positioning: Adjust tooltip position to stay within viewport
    * Prevents tooltip from being cut off at screen edges
    * 
-   * FIXED: Use requestAnimationFrame to prevent infinite loops
-   * and add threshold to avoid micro-adjustments
+   * FIX: Only adjust once when tooltip opens to prevent flickering
    */
   useEffect(() => {
-    if (!open || !tooltipRef.current || !triggerRef.current) return;
-    if (isAdjustingRef.current) return; // Prevent re-entrant calls
+    if (!open || !tooltipRef.current || !triggerRef.current) {
+      // Reset adjustment flag when tooltip closes
+      hasAdjustedRef.current = false;
+      return;
+    }
 
-    isAdjustingRef.current = true;
+    // Skip if we've already adjusted position for this open session
+    if (hasAdjustedRef.current) return;
 
-    // Use RAF to batch DOM reads and prevent layout thrashing
-    requestAnimationFrame(() => {
+    // Use requestAnimationFrame to ensure tooltip is rendered before measuring
+    const rafId = requestAnimationFrame(() => {
       const tooltip = tooltipRef.current;
       const trigger = triggerRef.current;
-      
-      if (!tooltip || !trigger) {
-        isAdjustingRef.current = false;
-        return;
-      }
+      if (!tooltip || !trigger) return;
 
       const tooltipRect = tooltip.getBoundingClientRect();
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
-      
-      // Add threshold to prevent micro-adjustments (10px buffer)
-      const threshold = 10;
       let newPlacement = placement;
 
-      // Check horizontal boundaries with threshold
-      if (tooltipRect.right > viewportWidth - threshold) {
+      // Check horizontal boundaries
+      if (tooltipRect.right > window.innerWidth - 10) {
         newPlacement = "left";
-      } else if (tooltipRect.left < threshold) {
+      } else if (tooltipRect.left < 10) {
         newPlacement = "right";
       }
 
-      // Check vertical boundaries with threshold
-      // Only override horizontal adjustment if necessary
-      if (tooltipRect.bottom > viewportHeight - threshold) {
+      // Check vertical boundaries
+      if (tooltipRect.bottom > window.innerHeight - 10) {
         newPlacement = "top";
-      } else if (tooltipRect.top < threshold) {
+      } else if (tooltipRect.top < 10) {
         newPlacement = "bottom";
       }
 
-      // Only update if placement actually changed
+      // Only update if placement actually needs to change
       if (newPlacement !== adjustedPlacement) {
         setAdjustedPlacement(newPlacement);
       }
-
-      isAdjustingRef.current = false;
+      
+      // Mark as adjusted for this open session
+      hasAdjustedRef.current = true;
     });
-  }, [open, placement, adjustedPlacement]);
+
+    return () => cancelAnimationFrame(rafId);
+  }, [open]); // Remove placement and adjustedPlacement from dependencies to prevent loops
+
+  /**
+   * Reset adjusted placement when base placement prop changes
+   */
+  useEffect(() => {
+    setAdjustedPlacement(placement);
+    hasAdjustedRef.current = false;
+  }, [placement]);
 
   /**
    * Cleanup: Clear any pending hover timers on unmount
@@ -168,62 +172,45 @@ export default function HelpToggleSmall({
   }, [open]);
 
   /**
-   * Schedule tooltip opening with delay to prevent flickering
+   * Hover interaction handlers
    */
-  const scheduleOpen = (): void => {
-    if (open) return;
+  const onMouseEnter = (): void => {
+    if (openOn === "click") return;
     if (hoverTimerRef.current) window.clearTimeout(hoverTimerRef.current);
     hoverTimerRef.current = window.setTimeout(() => setOpen(true), hoverDelay);
   };
 
-  /**
-   * Immediately close tooltip and clear timers
-   */
-  const closeNow = (): void => {
-    if (hoverTimerRef.current) window.clearTimeout(hoverTimerRef.current);
+  const onMouseLeave = (): void => {
+    if (openOn === "click") return;
+    if (hoverTimerRef.current) {
+      window.clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
     setOpen(false);
   };
 
   /**
-   * Handle click toggle (when enabled)
+   * Click interaction handler
    */
   const onClickToggle = (): void => {
-    if (openOn === "click" || openOn === "both") {
-      setOpen((v) => !v);
-    }
+    if (openOn === "hover") return;
+    setOpen((prev) => !prev);
   };
 
   /**
-   * Handle mouse enter for hover interactions
-   */
-  const onMouseEnter = (): void => {
-    if (openOn === "hover" || openOn === "both") {
-      scheduleOpen();
-    }
-  };
-
-  /**
-   * Handle mouse leave for hover interactions
-   */
-  const onMouseLeave = (): void => {
-    if (openOn === "hover" || openOn === "both") {
-      closeNow();
-    }
-  };
-
-  /**
-   * Handle focus for keyboard navigation
+   * Focus handler for keyboard navigation
    */
   const onFocus = (): void => {
-    if (openOn === "hover" || openOn === "both") {
-      setOpen(true);
-    }
+    if (openOn === "click") return;
+    setOpen(true);
   };
 
   /**
-   * Handle blur - close only if focus moves outside component
+   * Blur handler
    */
   const onBlur = (e: React.FocusEvent): void => {
+    if (openOn === "click") return;
+    // Don't close if focus moves to the tooltip itself
     if (!rootRef.current?.contains(e.relatedTarget as Node)) {
       setOpen(false);
     }
