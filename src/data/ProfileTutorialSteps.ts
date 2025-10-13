@@ -33,7 +33,7 @@ export const getProfileTutorialSteps = (): TutorialStep[] => [
   // Step 3: Past jobs - manual entry
   {
     id: "past-jobs-custom",
-    target: "#career-intent .lg\\:table td:first-child",
+    target: "#career-intent",
     title: "Past Roles (Fully Customizable)",
     content:
       "Click 'Edit' to search and add up to 5 past occupations. You can add any roles manually - they don't need to come from the analyzer test. These help us understand your experience but won't trigger automatic analysis.",
@@ -43,7 +43,7 @@ export const getProfileTutorialSteps = (): TutorialStep[] => [
   // Step 4: Target job - this is special!
   {
     id: "target-job-auto-analysis",
-    target: "#career-intent .lg\\:table td:nth-child(2)",
+    target: "#career-intent ",
     title: "Target Occupation (Auto-Analysis)",
     content:
       "This is important! When you select a target occupation, we automatically fetch relevant training courses for you. This is the ONLY field that triggers automatic analysis. Change it anytime to get fresh training recommendations.",
@@ -53,7 +53,7 @@ export const getProfileTutorialSteps = (): TutorialStep[] => [
   // Step 5: Region selection - manual only
   {
     id: "region-manual",
-    target: "#career-intent .lg\\:table td:last-child",
+    target: "#career-intent ",
     title: "Preferred Region (Your Choice)",
     content:
       "Choose the Australian state or territory where you want to work. This is purely informational and can be updated anytime. It doesn't affect the training advice - that's based solely on your target occupation.",
@@ -64,7 +64,7 @@ export const getProfileTutorialSteps = (): TutorialStep[] => [
   {
     id: "skill-roadmap-manual",
     target: "#skill-roadmap",
-    title: "Step 2: Your Skill Roadmap (Manual Planning)",
+    title: "Step 2: Your Skill Roadmap",
     content:
       "This is your personal skill development tracker. You can manually add any skills you want to learn, set timelines, and organize them by category. If you've completed the analyzer test, missing skills will appear here automatically, but you're free to customize everything.",
     placement: "top",
@@ -73,7 +73,7 @@ export const getProfileTutorialSteps = (): TutorialStep[] => [
   // Step 7: Roadmap features and customization
   {
     id: "roadmap-features",
-    target: "#skill-roadmap .rounded-xl.border",
+    target: "#skill-roadmap",
     title: "Customize Your Learning Plan",
     content:
       "Add target dates to each skill, manually add new skills, change categories, or remove items. Use filters to organize by type (Knowledge, Tech, Skills) or status (Not Started, In Progress, Completed). Everything here is under your control.",

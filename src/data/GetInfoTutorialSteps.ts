@@ -63,10 +63,10 @@ export const getInfoTutorialSteps: TutorialStep[] = [
   },
   {
     id: "next-button",
-    target: "footer button[disabled]",
+    target: "footer button",
     title: "Disabled Button Help",
     content:
-      "Notice the 'Next' button? If it's disabled (grayed out), hover your mouse over it to see what's required to proceed. The tooltip will show you exactly which fields need to be completed.",
+      "Notice the 'Next' button? If it's disabled (grayed out), hover your mouse over it to see what's required to proceed(only in destop). The tooltip will show you exactly which fields need to be completed.",
     placement: "top",
   },
   {

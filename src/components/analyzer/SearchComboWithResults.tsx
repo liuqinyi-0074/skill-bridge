@@ -33,6 +33,7 @@ export type SearchComboWithResultsProps = {
 };
 
 const CARD_BODY_MAX_H = 96; // px
+const MAX_KEYWORD_LEN = 20; // Max characters allowed for keyword
 
 const SearchComboWithResults: React.FC<SearchComboWithResultsProps> = ({
   industryOptions,
@@ -53,15 +54,20 @@ const SearchComboWithResults: React.FC<SearchComboWithResultsProps> = ({
   selectedCount,
   addDisabledReason,
 }) => {
-  /** 哪些卡片已展开 */
+  /** Track expanded cards */
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  /** 哪些卡片描述会溢出，需要切换按钮 */
+  /** Track which cards overflow and need a toggle */
   const [overflow, setOverflow] = useState<Record<string, boolean>>({});
 
   const reachedCap = selectedCount >= maxSelectable;
 
   const trimmed = keyword.trim();
+
+  /** English letters only validation (empty is allowed so user can type) */
   const englishOk = trimmed === "" || /^[A-Za-z][A-Za-z\s'-]*$/.test(trimmed);
+
+  /** True when keyword length exceeds the 20 char limit */
+  const tooLong = trimmed.length > MAX_KEYWORD_LEN;
 
   const makeMeasureRef = (code: string) => (el: HTMLDivElement | null) => {
     if (!el) return;
@@ -71,7 +77,7 @@ const SearchComboWithResults: React.FC<SearchComboWithResultsProps> = ({
 
   const industryOptionsWithPlaceholder = useMemo<Option[]>(
     () => [{ value: "", label: "Select an industry…" }, ...industryOptions],
-    [industryOptions]
+    [industryOptions],
   );
 
   return (
@@ -97,13 +103,17 @@ const SearchComboWithResults: React.FC<SearchComboWithResultsProps> = ({
 
         {/* Keyword input */}
         <label className="flex flex-col gap-1">
-          <span className="text-sm font-medium">Keyword</span>
+          <span className="text-sm font-medium">
+            Keyword <span className="text-ink-soft">(max {MAX_KEYWORD_LEN})</span>
+          </span>
           <input
             className="h-10 rounded-lg border border-border px-3"
             placeholder="Type a role keyword (e.g., analyst)"
             value={keyword}
             onChange={(e) => onKeywordChange(e.target.value)}
             aria-label="Keyword"
+            // Hard limit in the input element to stop further typing
+            maxLength={MAX_KEYWORD_LEN}
           />
         </label>
 
@@ -114,25 +124,36 @@ const SearchComboWithResults: React.FC<SearchComboWithResultsProps> = ({
             size="md"
             onClick={onSearch}
             aria-label="Search roles"
-            disabled={!englishOk}
-            tooltipWhenDisabled={!englishOk ? "Please enter English letters only." : undefined}
+            // Disable when non-English or too long
+            disabled={!englishOk || tooLong}
+            tooltipWhenDisabled={
+              !englishOk
+                ? "Please enter English letters only."
+                : tooLong
+                ? `Please use at most ${MAX_KEYWORD_LEN} characters.`
+                : undefined
+            }
           >
             Search roles
           </Button>
         </div>
       </div>
 
-      {/* Error messages: 默认不显示，只有出错条件下渲染 */}
+      {/* Validation messages */}
       {!englishOk && (
-        <div className="mt-3 rounded-md bg-red-50 text-red-900 p-3 text-sm">
+        <div className="mt-3 rounded-md bg-red-50 p-3 text-sm text-red-900">
           Please enter English letters only.
         </div>
       )}
 
-      {searchError && (
-        <div className="mt-3 rounded-md bg-red-50 text-red-900 p-3 text-sm">
-          {searchError}
+      {tooLong && (
+        <div className="mt-3 rounded-md bg-amber-50 p-3 text-sm text-amber-900">
+          Your keyword is too long. Use at most {MAX_KEYWORD_LEN} characters.
         </div>
+      )}
+
+      {searchError && (
+        <div className="mt-3 rounded-md bg-red-50 p-3 text-sm text-red-900">{searchError}</div>
       )}
 
       {reachedCap && (
@@ -145,17 +166,22 @@ const SearchComboWithResults: React.FC<SearchComboWithResultsProps> = ({
       )}
 
       {isError && (
-        <div className="mt-3 rounded-md bg-red-50 text-red-900 p-3 text-sm">
+        <div className="mt-3 rounded-md bg-red-50 p-3 text-sm text-red-900">
           Our system may be having an issue right now. Please try again later or{" "}
-          <a href="/feedback" className="underline underline-offset-2 font-medium" target="_blank" rel="noreferrer">
+          <a
+            href="/feedback"
+            className="font-medium underline underline-offset-2"
+            target="_blank"
+            rel="noreferrer"
+          >
             send feedback
           </a>
           .
         </div>
       )}
 
-      {noResults && englishOk && !isFetching && (
-        <div className="mt-3 rounded-md bg-blue-50 text-blue-900 p-3 text-sm">
+      {noResults && englishOk && !isFetching && !tooLong && (
+        <div className="mt-3 rounded-md bg-blue-50 p-3 text-sm text-blue-900">
           This industry does not contain roles matching your keyword. Please verify your input or try a different
           industry.
         </div>
@@ -173,7 +199,7 @@ const SearchComboWithResults: React.FC<SearchComboWithResultsProps> = ({
           const desc: string = typeof rawDesc === "string" ? rawDesc : "";
           const hasDesc = desc.trim().length > 0;
           const expandedNow = Boolean(expanded[it.code]);
-          const showToggle = hasDesc && (overflow[it.code] ?? false); // 仅溢出时显示箭头
+          const showToggle = hasDesc && (overflow[it.code] ?? false); // Show toggle only when overflowing
 
           return (
             <li key={it.code} className="h-full">
@@ -184,12 +210,12 @@ const SearchComboWithResults: React.FC<SearchComboWithResultsProps> = ({
                     <div className="min-w-0 max-w-full">
                       <div className="flex items-start gap-2">
                         <h4
-                          className="text-sm font-semibold text-ink break-words whitespace-normal leading-5"
+                          className="min-w-0 break-words whitespace-normal text-sm font-semibold leading-5 text-ink"
                           title={it.title}
                         >
                           {it.title}
                         </h4>
-                        <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-ink-soft shrink-0">
+                        <span className="shrink-0 rounded-full border border-border px-2 py-0.5 text-[11px] text-ink-soft">
                           {it.code}
                         </span>
                       </div>
@@ -224,7 +250,7 @@ const SearchComboWithResults: React.FC<SearchComboWithResultsProps> = ({
                     <div className="relative mt-2">
                       <div
                         ref={makeMeasureRef(it.code)}
-                        className={`text-xs leading-5 text-ink-soft break-words whitespace-normal ${
+                        className={`break-words whitespace-normal text-xs leading-5 text-ink-soft ${
                           expandedNow ? "" : "max-h-[96px] overflow-hidden"
                         }`}
                         style={!expandedNow ? { maxHeight: CARD_BODY_MAX_H } : undefined}
@@ -240,7 +266,7 @@ const SearchComboWithResults: React.FC<SearchComboWithResultsProps> = ({
                         <button
                           type="button"
                           onClick={() => setExpanded((p) => ({ ...p, [it.code]: !p[it.code] }))}
-                          className="absolute right-0 bottom-1 translate-y-0 rounded-full p-1 text-ink-soft hover:text-ink"
+                          className="absolute bottom-1 right-0 translate-y-0 rounded-full p-1 text-ink-soft hover:text-ink"
                           aria-label={expandedNow ? "Collapse" : "Expand to view all"}
                           title={expandedNow ? "Collapse" : "View full description"}
                         >
