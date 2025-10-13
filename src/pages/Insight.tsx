@@ -281,6 +281,9 @@ function InsightInner(): React.ReactElement {
           label="View Tutorial"
           variant="outline"
           ariaLabel="View Career Insights Tutorial"
+          className="z-50"        
+          headerOffset={64}          
+          tutorialHeaderOffset={64} 
         />
       </div>
 

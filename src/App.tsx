@@ -1,17 +1,14 @@
 // src/App.tsx
 import { Suspense, lazy, useEffect, useMemo, useState } from "react"
-import { Routes, Route, Navigate, useLocation } from "react-router-dom"
+import { useNavigate, Routes, Route, Navigate, useLocation } from "react-router-dom"
 import MainLayout from "./layouts/MainLayout"
 import ErrorBoundary from "./components/common/ErrorBoundary"
 import AnalyzerEntry from "./pages/Analyzer/AnalyzerEntry"
 import { useAppDispatch } from "./store/hooks"
 import { resetAnalyzer } from "./store/analyzerSlice"
 
-// Read password from environment variable injected by Vite.
-// If undefined or empty, the gate will auto-unlock to avoid lockouts in dev.
 const PASSWORD: string | undefined = import.meta.env.VITE_SITE_PASSWORD
 
-// Lazy load pages to reduce initial bundle size.
 const Home = lazy(() => import("./pages/Home"))
 const Insight = lazy(() => import("./pages/Insight"))
 const Profile = lazy(() => import("./pages/Profile"))
@@ -20,11 +17,6 @@ const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"))
 const Terms = lazy(() => import("./pages/Terms"))
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"))
 
-/**
- * Spinner
- * -------
- * Small, accessible loading indicator for Suspense fallbacks.
- */
 function Spinner(): React.ReactElement {
   return (
     <div className="grid min-h-[40vh] place-items-center">
@@ -42,36 +34,37 @@ function Spinner(): React.ReactElement {
  * ------------
  * Frontend guard that asks for a password before rendering the real app.
  *
+ * Modified behavior:
+ * - Removed localStorage persistence for unlocked state
+ * - Password is required on every browser session/page reload
+ * - Unlocked state exists only in component memory during current session
+ *
  * How it works:
  * - If PASSWORD is missing, we skip the gate to avoid accidental lockouts.
- * - If present, we show a simple form. On success we set a localStorage flag.
- * - On reload, the flag keeps the app unlocked until the user clears storage.
+ * - If present, we show a simple form. On success we unlock the app.
+ * - On reload or reopening the browser, the gate will appear again.
  *
  * Security note:
  * - This is a UX gate. For real security, verify on a server or use Basic Auth.
  */
 function PasswordGate(props: { children: React.ReactElement }): React.ReactElement {
   const shouldGate = useMemo<boolean>(() => {
-    // Gate only when a non-empty password is configured.
     return typeof PASSWORD === "string" && PASSWORD.trim().length > 0
   }, [])
-
+   const navigate = useNavigate()
   const [input, setInput] = useState<string>("")
   const [error, setError] = useState<string>("")
-  const [unlocked, setUnlocked] = useState<boolean>(() => {
-    if (!shouldGate) return true
-    return localStorage.getItem("site_unlocked") === "true"
-  })
+  // No localStorage check - defaults to locked state on each session
+  const [unlocked, setUnlocked] = useState<boolean>(() => !shouldGate)
 
-  /** Validate the entered password and unlock on success. */
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
     e.preventDefault()
     if (!shouldGate) {
       setUnlocked(true)
+      navigate("/")
       return
     }
     if (input === PASSWORD) {
-      localStorage.setItem("site_unlocked", "true")
       setUnlocked(true)
       setError("")
     } else {
@@ -81,7 +74,6 @@ function PasswordGate(props: { children: React.ReactElement }): React.ReactEleme
 
   if (unlocked) return props.children
 
-  // Locked screen: minimal dependencies, keyboard-friendly form.
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
       <form
@@ -130,19 +122,11 @@ export default function App(): React.ReactElement {
   const { pathname, hash } = useLocation()
   const dispatch = useAppDispatch()
 
-  /**
-   * Scroll restore:
-   * - Navigate to top on each route change unless navigating to a hash anchor.
-   */
   useEffect(() => {
     if (hash) return
     window.scrollTo({ top: 0, left: 0, behavior: "auto" })
   }, [pathname, hash])
 
-  /**
-   * Auto-cleanup on tab close/refresh:
-   * - Resets Analyzer-related Redux state to avoid stale data on the next session.
-   */
   useEffect(() => {
     const handleBeforeUnload = (): void => {
       dispatch(resetAnalyzer())
@@ -153,7 +137,6 @@ export default function App(): React.ReactElement {
     }
   }, [dispatch])
 
-  // App routes are wrapped by PasswordGate.
   return (
     <PasswordGate>
       <ErrorBoundary feedbackHref="/feedback" onError={(e) => console.error(e)}>
@@ -170,7 +153,6 @@ export default function App(): React.ReactElement {
               <Route path="privacy-policy" element={<PrivacyPolicy />} />
               <Route path="terms" element={<Terms />} />
 
-              {/* 404 */}
               <Route path="404" element={<NotFoundPage />} />
               <Route path="*" element={<Navigate to="/404" replace />} />
             </Route>

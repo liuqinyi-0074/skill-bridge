@@ -1,10 +1,11 @@
 // src/pages/Profile.tsx
 // Profile page with tutorial matching Insight page style
-// - Tutorial button in top-right corner
-// - Export PDF button hidden on mobile
+// - Uses TutorialLauncher in the header (top-right corner)
+// - Export PDF button always visible (mobile + desktop)
 // - Shows skill roadmap from unmatched abilities
 // - Auto-fetches training advice
 // - VET glossary search for terminology lookup
+// - All English comments
 
 import React, { useEffect, useMemo, useRef, useState } from "react"
 import { useLocation } from "react-router-dom"
@@ -21,7 +22,8 @@ import CareerChoicePanel, {
 import SkillRoadMap, { type SkillRoadmapItem } from "../components/profile/SkillRoadMap"
 import TrainingAdviceList, { type TrainingAdvice } from "../components/profile/TrainingAdviceList"
 import VetGlossarySearch from "../components/profile/VetGlossarySearch"
-import Tutorial from "../components/tutorial/Tutorial"
+import TutorialLauncher from "../components/tutorial/TutorialLauncher"
+import { useTrainingAdvice } from "../hooks/queries/useTrainingAdvice"
 
 // Redux actions + types
 import {
@@ -44,7 +46,6 @@ import type {
 import { industryOptions, industryNameOf } from "../data/industries"
 import { useAnzscoSearch } from "../hooks/queries/userAnzscoSearch"
 import type { SearchParams } from "../hooks/queries/userAnzscoSearch"
-import { useTrainingAdvice } from "../hooks/queries/useTrainingAdvice"
 import { getProfileTutorialSteps } from "../data/ProfileTutorialSteps"
 import type { AnalyzerRouteState } from "../types/routes"
 import type { AnzscoOccupation } from "../types/domain"
@@ -230,7 +231,7 @@ const mapAdviceResToState = (
   return { occupation, courses }
 }
 
-/** SelectQuestion component for region selection */
+/** SelectQuestion modal for region selection */
 function SelectQuestion({
   title,
   open,
@@ -312,9 +313,6 @@ export default function Profile(): React.ReactElement {
   // Refs
   const exportRef = useRef<HTMLDivElement | null>(null)
   const vetTerminologyRef = useRef<HTMLDivElement>(null)
-
-  // Tutorial state
-  const [showTutorial, setShowTutorial] = useState(false)
 
   // Redux state
   const analyzer = useSelector((s: RootState) => s.analyzer)
@@ -450,27 +448,20 @@ export default function Profile(): React.ReactElement {
 
   return (
     <div id="profile-export-root" ref={exportRef}>
-      {/* Header with tutorial button (matching Insight page style) */}
+      {/* Header with tutorial button via TutorialLauncher */}
       <div id="profile-header" className="relative bg-white px-4 py-12 sm:px-6 lg:px-8">
-        {/* Tutorial button - top right corner */}
-        <div className="absolute top-4 right-4 sm:top-6 sm:right-8">
-          <button
-            onClick={() => setShowTutorial(true)}
-            className="inline-flex items-center gap-2 px-5 py-3 bg-white text-primary border-2 border-primary text-sm font-semibold rounded-full shadow-lg hover:bg-primary hover:text-white transition-all duration-200"
-            aria-label="View Tutorial"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <span className="hidden sm:inline">View Tutorial</span>
-            <span className="sm:hidden">Tutorial</span>
-          </button>
-        </div>
+        {/* Tutorial button in the top-right corner.
+           Header on this page is not fixed inside this block, so no headerOffset needed. */}
+        <TutorialLauncher
+          steps={getProfileTutorialSteps}
+          placement="top-right"
+          label="View Tutorial"
+          variant="outline"
+          ariaLabel="View Tutorial"
+          className="z-[60]"
+          headerOffset={0}
+          tutorialHeaderOffset={0}
+        />
 
         <div className="mx-auto max-w-7xl text-center">
           <div className="mb-3 flex items-center justify-center gap-2">
@@ -511,14 +502,14 @@ export default function Profile(): React.ReactElement {
       <div className="mx-auto max-w-7xl space-y-8 px-4 py-12 sm:px-6 lg:px-8">
         {/* Career Intent Section */}
         <section id="career-intent" className="relative">
-          {/* Export PDF button - hidden on mobile */}
-          <div className="absolute right-0 -top-6 sm:-top-8 hidden sm:block">
+          {/* Export PDF button — always visible now (removed `hidden sm:block`) */}
+          <div className="absolute right-0 -top-6 sm:-top-8">
             <button
               onClick={onExportPdf}
               className="inline-flex items-center gap-2 rounded-full border-2 border-primary bg-white px-4 py-2 text-sm font-semibold text-primary shadow-lg transition-all hover:bg-primary hover:text-white"
               aria-label="Export this page as PDF"
             >
-              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
                 <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M6 9V4h12v5M6 18H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-1M6 14h12v8H6v-8Z" />
               </svg>
               <span>Export PDF</span>
@@ -633,13 +624,6 @@ export default function Profile(): React.ReactElement {
           <VetGlossarySearch />
         </section>
       </div>
-
-      {/* Tutorial overlay */}
-      <Tutorial
-        steps={getProfileTutorialSteps()}
-        isOpen={showTutorial}
-        onClose={() => setShowTutorial(false)}
-      />
     </div>
   )
 }

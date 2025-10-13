@@ -1,168 +1,182 @@
 // src/data/ProfileTutorialSteps.ts
-// Complete Profile page tutorial steps
-// Uses simplified selectors that work on both mobile and desktop
-// Follows Insight page tutorial style
+// Tutorial steps for the Profile page
+// This page is fully customizable - users can manually edit all fields
+// Only selecting a target job triggers automatic training advice analysis
 
 import type { TutorialStep } from "../components/tutorial/Tutorial";
 
 /**
- * Get Profile tutorial steps
- * Returns array of tutorial steps for the Profile page
- * 
- * Design principles:
- * - Use container-level selectors (IDs) that work on all screen sizes
- * - Avoid desktop-specific class selectors (e.g., .lg:table)
- * - Keep content concise for mobile readability
- * - Use friendly emojis to enhance UX
+ * Generate tutorial steps for Profile page
+ * Returns array of steps with detailed guidance for all profile features
  */
 export const getProfileTutorialSteps = (): TutorialStep[] => [
-  // Step 1: Welcome and overview
+  // Step 1: Welcome and page overview
   {
     id: "profile-welcome",
     target: "#profile-header",
     title: "Welcome to Your Profile!",
     content:
-      "This is your career command center. Here you'll organize your career goals, track skills you need to develop, and discover training courses that match your target role. Let's take a quick tour!",
+      "This is your personalized career command center. Unlike the analyzer test, everything here is fully customizable. You can manually add, edit, or remove any information to suit your career goals. Let's explore what you can do!",
     placement: "bottom",
   },
 
   // Step 2: Career Intent section introduction
   {
-    id: "career-intent-section",
+    id: "career-intent-intro",
     target: "#career-intent",
     title: "Step 1: Define Your Career Intent",
     content:
-      "Start by telling us about your career journey. Select up to 5 past roles, choose your target occupation, and pick your preferred work location. This helps us personalize your skill roadmap and training recommendations.",
+      "This section is completely customizable. Add your past roles, choose your target occupation, and select your preferred work location. All fields can be edited at any time to reflect your evolving career goals.",
     placement: "bottom",
   },
 
-  // Step 3: Past jobs explanation
+  // Step 3: Past jobs - manual entry
   {
-    id: "past-jobs-detail",
-    target: "#career-intent",
-    title: "Your Past Roles Matter ",
+    id: "past-jobs-custom",
+    target: "#career-intent .lg\\:table td:first-child",
+    title: "Past Roles (Fully Customizable)",
     content:
-      "Click 'Edit' next to 'Past' to search and add up to 5 past occupations. This helps us understand your experience background and current skill level.",
+      "Click 'Edit' to search and add up to 5 past occupations. You can add any roles manually - they don't need to come from the analyzer test. These help us understand your experience but won't trigger automatic analysis.",
+    placement: "bottom",
+  },
+
+  // Step 4: Target job - this is special!
+  {
+    id: "target-job-auto-analysis",
+    target: "#career-intent .lg\\:table td:nth-child(2)",
+    title: "Target Occupation (Auto-Analysis)",
+    content:
+      "This is important! When you select a target occupation, we automatically fetch relevant training courses for you. This is the ONLY field that triggers automatic analysis. Change it anytime to get fresh training recommendations.",
     placement: "top",
   },
 
-  // Step 4: Target job importance
+  // Step 5: Region selection - manual only
   {
-    id: "target-job-detail",
-    target: "#career-intent",
-    title: "Choose Your Target Occupation ",
+    id: "region-manual",
+    target: "#career-intent .lg\\:table td:last-child",
+    title: "Preferred Region (Your Choice)",
     content:
-      "This is crucial! Select the occupation you're aiming for. Once set, we'll suggest relevant training courses. You can change this anytime.",
+      "Choose the Australian state or territory where you want to work. This is purely informational and can be updated anytime. It doesn't affect the training advice - that's based solely on your target occupation.",
     placement: "top",
   },
 
-  // Step 5: Region selection
+  // Step 6: Skill Roadmap - fully manual
   {
-    id: "region-detail",
-    target: "#career-intent",
-    title: "Set Your Preferred Region ",
-    content:
-      "Choose the Australian state or territory where you want to work. This helps us provide location-specific job market insights and opportunities.",
-    placement: "top",
-  },
-
-  // Step 6: Skill Roadmap introduction
-  {
-    id: "skill-roadmap-intro",
+    id: "skill-roadmap-manual",
     target: "#skill-roadmap",
-    title: "Step 2: Your Skill Development Roadmap ",
+    title: "Step 2: Your Skill Roadmap (Manual Planning)",
     content:
-      "This section shows ONLY the skills you're currently missing for your target occupation. Think of it as your personal learning checklist! Add target dates to plan your development journey.",
+      "This is your personal skill development tracker. You can manually add any skills you want to learn, set timelines, and organize them by category. If you've completed the analyzer test, missing skills will appear here automatically, but you're free to customize everything.",
     placement: "top",
   },
 
-  // Step 7: How to use the roadmap
+  // Step 7: Roadmap features and customization
   {
-    id: "skill-roadmap-usage",
-    target: "#skill-roadmap",
-    title: "Plan Your Learning Timeline ",
+    id: "roadmap-features",
+    target: "#skill-roadmap .rounded-xl.border",
+    title: "Customize Your Learning Plan",
     content:
-      "Click on any skill to add start and end dates. You can also manually add skills, edit categories, or remove items that aren't relevant. Use filters to organize by priority or timeline.",
+      "Add target dates to each skill, manually add new skills, change categories, or remove items. Use filters to organize by type (Knowledge, Tech, Skills) or status (Not Started, In Progress, Completed). Everything here is under your control.",
     placement: "top",
   },
 
   // Step 8: Empty roadmap guidance
   {
-    id: "no-roadmap-hint",
+    id: "empty-roadmap-guidance",
     target: "#skill-roadmap",
-    title: "Don't Have Skills Yet? ",
+    title: "Need Help Identifying Skills?",
     content:
-      "If your roadmap is empty, consider taking the Analyzer test first. It will assess your current abilities, match you with suitable roles, and automatically populate this roadmap.",
+      "If your roadmap is empty, consider taking the Analyzer test. It will assess your abilities against your target role and automatically populate this roadmap with the skills you're missing. But remember - this is optional! You can build your roadmap completely manually.",
     placement: "top",
   },
 
-  // Step 9: Training Advice introduction
+  // Step 9: Training Advice - auto-generated
   {
-    id: "training-advice-section",
+    id: "training-auto-generated",
     target: "#training-advice",
-    title: "Step 3: Discover Relevant Training ",
+    title: "Step 3: Training Advice (Auto-Generated)",
     content:
-      "Based on your target occupation, we automatically recommend VET (Vocational Education and Training) courses from Australia's official training registry. These courses help you gain the skills you're missing.",
+      "Based ONLY on your target occupation, we automatically fetch relevant VET (Vocational Education and Training) courses from Australia's official registry. This list updates whenever you change your target job. Remove courses that don't fit your needs.",
     placement: "top",
   },
 
   // Step 10: Training list management
   {
     id: "training-management",
-    target: "#training-advice",
-    title: "Customize Your Course List ",
+    target: "#training-advice .rounded-xl.border",
+    title: "Manage Your Course List",
     content:
-      "Review each course and remove ones that don't fit your needs or schedule. The list updates automatically when you change your target occupation. Click any course to view full details.",
+      "Review each course and click the remove button (×) to exclude courses that aren't relevant. The list regenerates automatically when you select a different target occupation. Click any course title to view full details on the official training website.",
     placement: "top",
   },
 
-  // Step 11: VET Terminology tool
+  // Step 11: Want detailed analysis reminder
+  {
+    id: "analyzer-test-reminder",
+    target: "#training-advice",
+    title: "Want More Detailed Analysis?",
+    content:
+      "The training advice here is based only on your target occupation. For a comprehensive skill gap analysis that considers your past experience and abilities, take the Analyzer test. It provides personalized recommendations based on your complete profile.",
+    placement: "top",
+  },
+
+  // Step 12: VET Terminology tool
   {
     id: "vet-terminology-tool",
     target: "#vet-terminology",
-    title: "Step 4: Understand Course Jargon ",
+    title: "Step 4: VET Terminology Dictionary",
     content:
-      "Confused by VET terms like 'RTO' or 'AQF'? Use this terminology dictionary to look up unfamiliar terms before enrolling in courses. It helps you make informed decisions about your training.",
+      "Confused by course jargon? Use this dictionary to look up unfamiliar VET (Vocational Education and Training) terms before enrolling in courses. Search for any term to get a clear explanation.",
     placement: "top",
   },
 
-  // Step 12: VET search demonstration
+  // Step 13: VET search demonstration
   {
     id: "vet-search-demo",
-    target: "#vet-terminology",
-    title: "Quick Terminology Lookup ",
+    target: "#vet-terminology input",
+    title: "Quick Term Lookup",
     content:
-      "Simply type any VET term or acronym you're unsure about, and we'll show you a clear explanation with related terms. This saves you time researching on your own.",
-    placement: "top",
+      "Type any unfamiliar term (like 'AQF', 'RTO', or 'competency') and we'll show you what it means. This helps you make informed decisions about training courses without needing to research elsewhere.",
+    placement: "bottom",
   },
 
-  // Step 13: Help button location
+  // Step 14: Export PDF feature
   {
-    id: "help-toggle-location",
-    target: "#profile-header",
-    title: "Quick Help Anytime ",
+    id: "export-pdf-feature",
+    target: "#career-intent button[aria-label*='Export']",
+    title: "Export Your Profile",
     content:
-      "See the question mark icons throughout the page? Click them anytime you need quick tips about a specific section. They provide context-sensitive help without interrupting your workflow.",
+      "Need to save or share your profile? Click 'Export PDF' to download a formatted document containing your career intent, skill roadmap, and training advice. Perfect for sharing with career counselors or keeping records.",
     placement: "left",
   },
 
-  // Step 14: Tutorial replay reminder
+  // Step 15: Help toggle location
+  {
+    id: "help-toggle-hint",
+    target: "#profile-header .shrink-0 [data-help-toggle]",
+    title: "Quick Help Anytime",
+    content:
+      "See this question mark icon? Click it for quick tips about each section. Each help popup provides context-specific guidance without interrupting your workflow.",
+    placement: "left",
+  },
+
+  // Step 16: Tutorial replay reminder
   {
     id: "tutorial-replay",
-    target: "#profile-header",
-    title: "Replay This Tour Anytime ",
+    target: "#profile-header button[aria-label*='Tutorial']",
+    title: "Replay This Tutorial",
     content:
-      "Found this tutorial helpful? You can replay it anytime by clicking the 'View Tutorial' button at the top of the page. Perfect for when you need a refresher!",
+      "You can replay this tutorial anytime by clicking the 'View Tutorial' button at the top of the page. Perfect for when you need a refresher on any feature!",
     placement: "left",
   },
 
-  // Step 15: Final call to action
+  // Step 17: Final summary and action plan
   {
-    id: "final-action-call",
-    target: "#career-intent",
-    title: "Ready to Get Started? ",
+    id: "final-action-plan",
+    target: "#profile-header",
+    title: "Your Action Plan",
     content:
-      "Here's your action plan: (1) Set your career intent, (2) Review your skill roadmap, (3) Browse recommended courses, and (4) Start learning! Take it step by step, and you'll be on track to your target role.",
+      "Ready to get started? Here's your workflow: (1) Set your target occupation to get training courses, (2) Manually plan your skill roadmap with timelines, (3) Review and remove irrelevant courses, (4) Look up any unfamiliar terms. For detailed skill gap analysis, take the Analyzer test!",
     placement: "bottom",
   },
 ];
