@@ -535,7 +535,6 @@ export default function Profile(): React.ReactElement {
               openOn="both"
               text={
                 <div>
-                  <div className="mb-1 font-semibold text-primary">Heads-up</div>
                   <p>
                     We list only <strong>missing abilities</strong> detected for your selected job. You can{" "}
                     <strong>customize</strong> this list at any time.

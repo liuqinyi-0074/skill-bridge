@@ -178,6 +178,7 @@ export default function AnalyzerSkillGap(): React.ReactElement {
         tips: [
           "Some skills may be learned on the job, others may require formal training.",
           "Don't be discouraged by the list - everyone has skill gaps!",
+          "If the Export PDF function isn't working, try a screenshot instead.",
         ],
       }}
     >
