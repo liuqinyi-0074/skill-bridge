@@ -146,7 +146,7 @@ export const getProfileTutorialSteps = (): TutorialStep[] => [
     target: "#career-intent button[aria-label*='Export']",
     title: "Export Your Profile",
     content:
-      "Need to save or share your profile? Click 'Export PDF' to download a formatted document containing your career intent, skill roadmap, and training advice. Perfect for sharing with career counselors or keeping records.",
+      "Need to save or share your profile? Click 'Export PDF' to download a formatted document containing your career intent, skill roadmap, and training advice. If the Export PDF function isn't working, try a screenshot instead.",
     placement: "left",
   },
 
