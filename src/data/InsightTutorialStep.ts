@@ -21,12 +21,12 @@ export const insightTutorialSteps: TutorialStep[] = [
       "This is your target job group.",
     placement: "bottom",
   },
-  {
-    id: "quick-stats",
-    target: "#quick-stats",
-    title: "Quick Statistics Overview",
+    {
+    id: "select-job",
+    target: "#select-job",
+    title: "select a job to see insight",
     content:
-      "Get a snapshot of key metrics at a glance: projected growth rates, and national rankings.",
+      "You can select a job to see insight",
     placement: "bottom",
   },
   {

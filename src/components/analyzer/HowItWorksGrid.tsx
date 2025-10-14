@@ -1,5 +1,4 @@
-// src/components/analyzer/HowItWorksGrid.tsx
-import React, { useRef } from "react";
+import  { useRef } from "react";
 import clsx from "clsx";
 import { useRevealOnView } from "../../hooks/userRevealOnView";
 
@@ -89,7 +88,8 @@ const HowItWorksGrid: React.FC<HowItWorksGridProps> = ({
       {/* Steps grid only; header is owned by the parent page */}
       <div
         role="list"
-        className="mx-auto max-w-6xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8"
+        className={clsx("mx-auto max-w-6xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8",
+                  "justify-items-center place-content-center")}
       >
         {steps.map((s, i) => (
           <StepCard

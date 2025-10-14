@@ -1,4 +1,3 @@
-// src/types/feedback.ts
 
 /**
  * Allowed feedback categories for the UI select.

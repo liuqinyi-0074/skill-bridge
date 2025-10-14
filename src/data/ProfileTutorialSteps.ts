@@ -1,4 +1,3 @@
-// src/data/ProfileTutorialSteps.ts
 // Tutorial steps for the Profile page
 // This page is fully customizable - users can manually edit all fields
 // Only selecting a target job triggers automatic training advice analysis

@@ -1,5 +1,4 @@
-﻿// src/components/analyzer/SearchComboWithResults.tsx
-import React, { useMemo, useState } from "react";
+﻿import { useMemo, useState } from "react";
 import type { AnzscoOccupation } from "../../types/domain";
 import Button from "../ui/Button";
 
@@ -30,6 +29,18 @@ export type SearchComboWithResultsProps = {
   maxSelectable: number;
   selectedCount: number;
   addDisabledReason?: string;
+
+  /** 
+   * When true, the "Add" button remains clickable even after reaching the cap.
+   * The click will NOT call onAdd but will call onCapAddAttempt instead.
+   */
+  allowAddWhenCapped?: boolean;
+
+  /**
+   * Fired when user clicks "Add" while cap is reached and the item is not yet picked.
+   * Parent can show a confirm dialog and decide what to do next.
+   */
+  onCapAddAttempt?: (occ: AnzscoOccupation) => void;
 };
 
 const CARD_BODY_MAX_H = 96; // px
@@ -53,6 +64,8 @@ const SearchComboWithResults: React.FC<SearchComboWithResultsProps> = ({
   maxSelectable,
   selectedCount,
   addDisabledReason,
+  allowAddWhenCapped = false,
+  onCapAddAttempt,
 }) => {
   /** Track expanded cards */
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -193,13 +206,31 @@ const SearchComboWithResults: React.FC<SearchComboWithResultsProps> = ({
       <ul className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
         {results.map((it) => {
           const picked = pickedIds.includes(it.code);
-          const disableAdd = reachedCap && !picked;
+
+          // When cap is reached and item not yet picked:
+          // - If allowAddWhenCapped = false => disable Add
+          // - If allowAddWhenCapped = true  => keep enabled and route click to onCapAddAttempt
+          const disableAdd = (selectedCount >= maxSelectable) && !picked && !allowAddWhenCapped;
 
           const rawDesc = (it as { description?: unknown }).description;
           const desc: string = typeof rawDesc === "string" ? rawDesc : "";
           const hasDesc = desc.trim().length > 0;
           const expandedNow = Boolean(expanded[it.code]);
           const showToggle = hasDesc && (overflow[it.code] ?? false); // Show toggle only when overflowing
+
+          // Decide what happens on Add click
+          const handleAddClick = (): void => {
+            const capped = selectedCount >= maxSelectable;
+            if (capped && !picked) {
+              // If capped and not picked, give parent a chance to confirm replacement
+              if (allowAddWhenCapped && onCapAddAttempt) {
+                onCapAddAttempt(it);
+              }
+              // Do nothing else here; parent decides
+              return;
+            }
+            onAdd(it);
+          };
 
           return (
             <li key={it.code} className="h-full">
@@ -226,7 +257,7 @@ const SearchComboWithResults: React.FC<SearchComboWithResultsProps> = ({
                         <Button
                           variant="primary"
                           size="sm"
-                          onClick={() => onAdd(it)}
+                          onClick={handleAddClick}
                           disabled={disableAdd}
                           aria-label="Add role"
                           tooltipWhenDisabled={

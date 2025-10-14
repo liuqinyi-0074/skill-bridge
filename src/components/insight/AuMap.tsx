@@ -1,7 +1,6 @@
-// src/components/insight/AuMap.tsx
 // Interactive SVG map of Australia with choropleth coloring
 // Mobile optimized: Info card hidden on small screens
-// All English comments
+
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Feature, FeatureCollection, Geometry } from "geojson";
@@ -21,8 +20,8 @@ export interface AuSvgMapProps {
 }
 
 /** Color palette for the choropleth map */
-const GRAY_ZERO = "#CBD5E1";   // 0 or missing values
-const PRIMARY = "#5E75A4";     // theme primary color
+const GRAY_ZERO = "#CBD5E1";   
+const PRIMARY = "#5E75A4";     
 const RAMP: ReadonlyArray<string> = [
   "#E9EEF6", 
   "#C9D3E6", 

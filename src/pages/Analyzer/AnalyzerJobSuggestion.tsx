@@ -1,10 +1,8 @@
-// src/pages/Analyzer/AnalyzerJobSuggestion.tsx
 // Uses split JobSuggestion card (left industries, right occupation groups).
 // Computes matchPct via hook result and passes into groups.
 // On Next, stores the selected job's unmatched buckets into Redux.
 // Route/cache fallback: if Redux is missing after refresh/private mode,
 // read from location.state and write back to Redux.
-// English comments only inside code.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";

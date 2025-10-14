@@ -1,96 +1,124 @@
 # SkillBridge
 
-SkillBridge is a React + TypeScript application that guides users through a career analysis journey, highlights skill gaps, and surfaces training resources and high-level labour market insights. It combines a multi-step Analyzer wizard with a persistent Profile hub and an Insight dashboard backed by real-world data.
+## Overview
 
-## Features
-
-- **Career Analyzer Wizard**  
-  `Get Info → Abilities → Job Suggestion → Skill Gap → Training` collects role interests, preferred regions, industries, and expertise, then calls backend services to generate recommendations.
-
-- **Smart Job Suggestions**  
-  Occupations are ranked via parallel API calls (TanStack Query). Past roles from the Profile are automatically filtered so users only see fresh opportunities.
-
-- **Skill Gap & Training Advice**  
-  Missing abilities are captured in Redux, merged into the Profile’s Skill Roadmap, and paired with training courses fetched on demand. Users can prune or update the advice list in place.
-
-- **Insight Dashboard**  
-  Displays major group statistics, growth comparisons, and geographic demand on an interactive map. Includes skeleton states, error fallbacks, and an in-app tutorial.
-
-- **Supporting Modules**  
-  Feedback form with API integration, Privacy/Terms static pages, glossary search, and reusable Hero/Tutorial components for consistent onboarding.
+SkillBridge is a career-planning SPA that guides users from aspiration to action.  
+The multi-step Analyzer collects role interests, surfaces recommended occupations, highlights missing abilities, and suggests training.  
+A persistent Profile page keeps roadmaps and advice in sync, while the Insight dashboard visualises market data (growth, comparison rates, geographic demand).  
+The app is designed for modern UX: state persistence, skeleton loading, graceful error handling, and tutorial overlays.
 
 ## Tech Stack
 
-| Layer        | Choice                                                    |
-|--------------|-----------------------------------------------------------|
-| Framework    | React 19, Vite                                            |
-| Language     | TypeScript 5                                              |
-| State        | Redux Toolkit, React Redux                                |
-| Data Fetch   | TanStack Query 5                                          |
-| Routing      | React Router 7                                            |
-| Styling      | Tailwind CSS 4, clsx                                      |
-| Visualization| Recharts, D3 Geo, TopoJSON                                |
-| Tooling      | ESLint + Prettier, Vitest, Playwright (preconfigured)     |
+| Layer            | Selection                                                     |
+|------------------|---------------------------------------------------------------|
+| Framework        | React 19 + Vite 7                                             |
+| Language         | TypeScript 5                                                  |
+| Routing          | React Router 7                                                |
+| State Management | Redux Toolkit + React Redux                                   |
+| Data Fetching    | TanStack Query 5 (parallel queries, caching, retries)         |
+| Styling & UI     | Tailwind CSS 4, clsx, Lucide icons, custom Hero/Tutorial UI   |
+| Visualisation    | Recharts, D3-geo, TopoJSON                                    |
+| Misc Tools       | GSAP, html-to-image, jsPDF, redux-persist                     |
+| Quality & Tooling| ESLint + Prettier, TypeScript ESLint, Vitest & Playwright (preconfigured) |
 
-## Project Structure (partial)
+## Installation & Run
+
+```bash
+# 1. Install dependencies
+npm install
+
+# 2. Start development server (http://localhost:5173 by default)
+npm run dev
+
+# 3. Build production bundle
+npm run build
+
+# 4. Preview production build locally
+npm run preview
+
+# 5. Lint codebase
+npm run lint
+```
+
+> **Node ≥ 18** is recommended.  
+> Switch to `pnpm`/`yarn` if preferred (update scripts accordingly).
+
+## Environment Variables
+
+Create `.env` (or `.env.local`) in the project root:
+
+```bash
+VITE_API_BASE=https://your-api-gateway.example.com/
+VITE_SITE_PASSWORD=                           # leave empty to skip password gate
+```
+
+- `VITE_API_BASE` – Base URL for backend APIs handling search, skills, growth, shortage, etc.
+- `VITE_SITE_PASSWORD` – Optional lightweight access gate; omit or leave blank for immediate access.
+
+## Project Structure
 
 ```
 src/
-├─ App.tsx                # Entry / routes
-├─ layouts/               # Layout components
-├─ pages/                 # Analyzer, Insight, Profile, Feedback, etc.
-├─ components/            # Analyzer widgets, Insight charts, Profile roadmap
-├─ hooks/                 # Query hooks, reveal-on-view animation hooks
-├─ lib/api/               # API clients (search, skills, shortage, growth, contact)
-├─ store/                 # Redux slice, typed hooks
-├─ data/                  # Static datasets (industries, tutorial steps)
-└─ types/                 # Shared domain types
+├─ App.tsx                   # Root router & Suspense
+├─ layouts/                  # Main layout, header/footer
+├─ components/
+│  ├─ analyzer/              # JobSuggestion cards, Ability pickers, etc.
+│  ├─ insight/               # Map, growth chart, comparison chart
+│  ├─ profile/               # SkillRoadMap, TrainingAdvice UI
+│  ├─ tutorial/              # Reusable tutorial overlay
+│  └─ ui/                    # Buttons, toggles, helpers
+├─ pages/                    # Home, Analyzer, Profile, Insight, Feedback, static pages
+├─ hooks/                    # TanStack Query hooks, reveal-on-view, route helpers
+├─ lib/
+│  ├─ api/                   # API clients (search, skills, growth, shortage, contact)
+│  └─ utils/                 # PDF export, helpers
+├─ store/                    # Redux slice, typed hooks
+├─ data/                     # Industry options, tutorial steps
+└─ types/                    # Domain types (roles, abilities, routes, API contracts)
 ```
 
-## Getting Started
+## Common NPM Commands
 
-1. **Install dependencies**
-   ```bash
-   npm install
-   ```
-2. **Create environment variables** (`.env` or `.env.local`)
-   ```bash
-   VITE_API_BASE=https://your-api-gateway.example.com/
-   VITE_SITE_PASSWORD=YourSitePassword
-   ```
-3. **Start the dev server**
-   ```bash
-   npm run dev
-   ```
-4. **Build / preview / lint**
-   ```bash
-   npm run build
-   npm run preview
-   npm run lint
-   ```
+| Command          | Description                                    |
+|------------------|------------------------------------------------|
+| `npm run dev`    | Start Vite dev server (with HMR)               |
+| `npm run build`  | Type-check + bundle production assets          |
+| `npm run preview`| Preview the production build locally           |
+| `npm run lint`   | ESLint (TypeScript + React + formatting rules) |
 
-## Key Design Notes
+Vitest/Playwright are preconfigured; add tests under `tests/` or `playwright/` and run `npx vitest` / `npx playwright test` as needed.
 
-- Analyzer state is persisted in `analyzerSlice` and hydrated from `location.state` where necessary to survive refreshes or private browsing.
-- Job Suggestion filters out roles the user has already listed in the Profile, keeping recommendations fresh.
-- Skill Gap results are normalized and merged into the Profile’s Skill Roadmap without overwriting user-added items.
-- Insight normalizes API payloads (`safeNumber`, `safeString`) before rendering charts to guard against inconsistent fields.
-- UI components emphasise accessibility: skeletons use `aria-busy`, hero imagery is optionally decorative, map/chart sections include textual guidance.
+## Deployment
 
-## API Overview
+1. **Build** – `npm run build` produces static assets under `dist/`.
+2. **Serve** – Deploy `dist/` to any static host (Vercel, Netlify, Cloudflare Pages, S3 + CloudFront, etc.).
+3. **API Base** – Ensure `VITE_API_BASE` points to the correct production backend via environment variables at build time.
 
-| Endpoint                              | Description                                |
-|---------------------------------------|--------------------------------------------|
-| `/anzsco/search`                      | Occupation search by industry & keyword    |
-| `/anzsco/{code}/skills`               | Fetch knowledge / skill / tech abilities   |
-| `/api/career-growth/{code}`           | Career growth stats (major group)          |
-| `/anzsco/{code}/shortage`             | Geographic demand / shortage data          |
-| `/contact`                            | Submit feedback form                       |
+CI/CD (GitHub Actions, etc.) can run `npm ci && npm run lint && npm run build` before publishing artifacts.
 
-## License
+## Code Style & Testing
 
-No licence file is included. Add one if you plan to distribute or open-source the project.
+- ESLint + Prettier enforce consistent formatting and React Hook rules.
+- Tailwind class ordering is handled by `prettier-plugin-tailwindcss`.
+- Types are strict; avoid `any` and leverage domain typings under `src/types/`.
+- For automated tests, intercept API calls in E2E (Playwright/Cypress) to stabilise async flows and skeleton states.
+
+## API Endpoints (Summary)
+
+| Endpoint / Client                                   | Purpose                                                     |
+|-----------------------------------------------------|-------------------------------------------------------------|
+| `GET /anzsco/search`                                | Search occupations by industry and keyword                  |
+| `GET /anzsco/{code}/skills`                         | Fetch abilities (knowledge/skill/tech) by ANZSCO code       |
+| `GET /anzsco/{code}/shortage`                       | Retrieve geographic shortage / employment distribution      |
+| `GET /api/career-growth/{code}`                     | Major group growth metrics (rates, rankings, employment)    |
+| `GET /api/anzsco/{code}/demand` (`getDemand`)       | Demand indicators / shortage labels for the occupation      |
+| `POST /occupation/rank` (`rankByCodes`)             | Rank occupations using selected abilities + industries      |
+| `GET /occupation/training/{code}`                   | Fetch recommended VET training advice                       |
+| `GET /glossary/detail?keyword=...`                  | Look up terminology definitions (VET glossary)              |
+| `POST /api/contact`                                     | Submit feedback / contact form                              |
+
+Each client wrapper normalises payloads (`safeNumber`, `safeString`) and surfaces errors via TanStack Query state flags (`isLoading`, `isError`, etc.), so UI components can render skeletons, fallbacks, or retries as needed.
 
 ---
 
-Feel free to extend SkillBridge with additional analytics, personalisation, or reporting capabilities to further support career planning. Enjoy building! 🚀
+SkillBridge is built to extend. Add new data sources, enhance analysis steps, or integrate reporting with minimal friction. Happy hacking! 🚀

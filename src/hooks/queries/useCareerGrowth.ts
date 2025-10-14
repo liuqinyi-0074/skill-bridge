@@ -1,4 +1,3 @@
-
 import { useQuery } from "@tanstack/react-query";
 import { getCareerGrowthByCode } from "../../lib/api/jobData/getCareerGrowthByCode";
 import type { CareerGrowthResponse } from "../../types/careerGrowth";

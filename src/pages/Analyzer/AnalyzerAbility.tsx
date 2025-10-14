@@ -1,4 +1,3 @@
-// src/pages/analyzer/AnalyzerAbilities.tsx
 /**
  * AnalyzerAbilities
  * - Fetch + merge abilities by occupation codes.

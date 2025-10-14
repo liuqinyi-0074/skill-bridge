@@ -1,4 +1,3 @@
-// src/store/analyzerSlice.ts
 // Complete version with reset and auto-cleanup functionality
 
 import { createSlice } from "@reduxjs/toolkit";

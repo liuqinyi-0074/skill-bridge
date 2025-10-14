@@ -1,4 +1,3 @@
-// frontend/src/components/analyzer/VetGlossarySearch.tsx
 // VET glossary search component for training terminology lookup.
 // Displays term description, acronyms, also_called names, and clickable see_also links.
 

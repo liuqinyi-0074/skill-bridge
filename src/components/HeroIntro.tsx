@@ -1,4 +1,3 @@
-// HeroIntro.tsx
 import { useRef } from "react";
 import { Link, type To } from "react-router-dom";
 import clsx from "clsx";
@@ -63,7 +62,7 @@ export default function HeroIntro({
     <section
       className={clsx(
         "relative w-full box-border",
-        "overflow-hidden isolate", // 改为 overflow-hidden (不只是 x 轴)
+        "overflow-hidden isolate", 
         "px-4 sm:px-6 lg:px-8 pt-10 sm:pt-12 lg:pt-20 pb-14 sm:pb-16 lg:pb-24",
         TONE_BG[tone],
         className
@@ -140,10 +139,10 @@ export default function HeroIntro({
           ref={rightRef}
           className={clsx(
             "relative flex items-center justify-center",
-            "min-w-0 max-w-full", // 添加 max-w-full 防止溢出
+            "min-w-0 max-w-full",
             "opacity-0 md:translate-x-6",
             "transform-gpu transition-all duration-700 ease-out will-change-transform",
-            "overflow-hidden" // 确保内容不会溢出
+            "overflow-hidden" 
           )}
         >
           {image ? (

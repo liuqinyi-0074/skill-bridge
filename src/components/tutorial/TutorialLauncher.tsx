@@ -4,8 +4,9 @@
 // - Desktop: icon + label
 // - Top placements: override `top` per breakpoint to avoid fixed header
 // - Higher z-index than common headers
+// - New: auto-open once per browser via localStorage key
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Tutorial from "./Tutorial";
 import type { TutorialStep } from "./Tutorial";
 
@@ -19,16 +20,20 @@ type Props = {
   className?: string;
   variant?: "outline" | "filled";
   icon?: React.ReactNode;
-  /** Fixed header height in px, e.g. 64 for h-16 */
+  /** Fixed header height in px, e.g., 64 for h-16. */
   headerOffset?: number;
-  /** z-index for the launcher wrapper; default higher than header(z-40) */
+  /** z-index for the launcher wrapper; default higher than header (z-40). */
   zIndex?: number;
-  /** Pass-through to Tutorial for scroll-centering */
+  /** Pass-through to Tutorial for scroll-centering. */
   tutorialHeaderOffset?: number;
+  /** Auto open once per browser session based on a stable key. */
+  autoOpenOnceKey?: string;
+  /** Optional delay before auto open (ms). */
+  autoOpenDelayMs?: number;
 };
 
 const placementBase: Record<Exclude<Placement, "inline">, string> = {
-  "top-right": "absolute right-4 sm:right-8",     // top 由 inline style 控制
+  "top-right": "absolute right-4 sm:right-8",
   "top-left": "absolute left-4 sm:left-8",
   "bottom-right": "absolute bottom-4 right-4 sm:bottom-6 sm:right-8",
   "bottom-left": "absolute bottom-4 left-4 sm:bottom-6 sm:left-8",
@@ -53,6 +58,8 @@ export default function TutorialLauncher({
   headerOffset = 0,
   zIndex = 60,
   tutorialHeaderOffset,
+  autoOpenOnceKey,
+  autoOpenDelayMs = 0,
 }: Props): React.ReactElement {
   const [open, setOpen] = useState<boolean>(false);
 
@@ -64,12 +71,9 @@ export default function TutorialLauncher({
   const isInline = placement === "inline";
   const isTop = placement === "top-right" || placement === "top-left";
 
-  // Base classes for absolute placements; inline直接用 className
   const baseClass = isInline ? className : `${placementBase[placement as Exclude<Placement, "inline">]} ${className}`;
-
   const displayIcon = icon ?? <InfoIcon />;
 
-  // Button class保持原样式
   const btnClass =
     variant === "outline"
       ? "inline-flex items-center gap-2 rounded-full text-sm font-semibold transition-all duration-200 " +
@@ -83,7 +87,18 @@ export default function TutorialLauncher({
         "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/30 " +
         "w-10 h-10 justify-center sm:w-auto sm:h-auto sm:px-5 sm:py-3 sm:justify-start";
 
-  // 顶角位：分别渲染移动端与 ≥sm 两个 wrapper，用 style.top 覆盖
+  // Auto open once per browser based on a stable key
+  useEffect(() => {
+    if (!autoOpenOnceKey) return;
+    const seen = localStorage.getItem(autoOpenOnceKey) === "1";
+    if (seen) return;
+    const t = window.setTimeout(() => {
+      setOpen(true);
+      localStorage.setItem(autoOpenOnceKey, "1");
+    }, Math.max(0, autoOpenDelayMs));
+    return () => window.clearTimeout(t);
+  }, [autoOpenOnceKey, autoOpenDelayMs]);
+
   if (!isInline && isTop) {
     const topMobile = headerOffset + 16; // top-4 = 16px
     const topDesktop = headerOffset + 24; // sm:top-6 = 24px
@@ -122,7 +137,6 @@ export default function TutorialLauncher({
     );
   }
 
-  // 其他位置：原逻辑；bottom 位不需要 headerOffset 特殊处理
   return (
     <>
       <div

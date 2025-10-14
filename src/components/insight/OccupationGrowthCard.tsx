@@ -1,4 +1,3 @@
-// src/components/occupation/OccupationGrowthStats.tsx
 // Component displays major group growth statistics and employment projections.
 // - Shows ANZSCO major group (first 4 digits) category information
 // - Displays 5-year and 10-year growth rates with rankings

@@ -1,4 +1,3 @@
-// src/components/ui/HelpToggleSmall.tsx
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import clsx from "clsx";
 import { HelpCircle } from "lucide-react";

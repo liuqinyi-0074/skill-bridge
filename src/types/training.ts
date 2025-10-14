@@ -1,4 +1,3 @@
-// src/types/training.ts
 export interface TrainingAnzscoInfo {
   code: string;
   title: string;

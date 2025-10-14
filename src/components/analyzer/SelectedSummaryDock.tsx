@@ -1,10 +1,8 @@
-// src/components/analyzer/SelectedSummaryDock.tsx
 // Slide-in dock with width clamp and side-aware opener.
 // - Clamps panel width to viewport (never exceeds screen).
 // - Works on both "left" and "right" sides.
 // - Backdrop click closes the dock.
 // - Passes only `drafts` to SelectedSummary (no unsupported props).
-// - No `any` used.
 
 import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
@@ -114,7 +112,7 @@ export default function SelectedSummaryDock({
       {!open && (
         <button
           data-summary-dock
-        
+
           type="button"
           onClick={() => setOpen(true)}
           aria-label="Open selections"

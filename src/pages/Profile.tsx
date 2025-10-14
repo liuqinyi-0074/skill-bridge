@@ -469,10 +469,12 @@ export default function Profile(): React.ReactElement {
           placement="top-right"
           label="View Tutorial"
           variant="outline"
-          ariaLabel="View Tutorial"
-          className="z-[60]"
-          headerOffset={0}
-          tutorialHeaderOffset={0}
+          ariaLabel="View Profile Tutorial"
+          className="z-50"
+          headerOffset={64}
+          tutorialHeaderOffset={64}
+          autoOpenOnceKey="profile:tutorial:v1"
+          autoOpenDelayMs={300}
         />
 
         <div className="mx-auto max-w-7xl text-center">
@@ -528,7 +530,7 @@ export default function Profile(): React.ReactElement {
             </button>
           </div>
 
-          <h2 className="mb-4 text-2xl font-heading font-bold text-ink">Career Intent</h2>
+          <h2 className="mb-4 text-2xl font-heading font-bold text-ink">Personal Information</h2>
           <CareerChoicePanel
             value={careerChoiceValue}
             onChange={onCareerChoiceChange}
@@ -537,6 +539,47 @@ export default function Profile(): React.ReactElement {
             occupationSearch={occupationSearch}
           />
         </section>
+        {/* Insight CTA (screenshot style: large muted panel, text on top-left, button below) */}
+        <section id="insight-cta" className="mx-auto mt-10 max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
+          <div
+            className="rounded-3xl bg-slate-100 p-6 sm:p-8"
+          >
+            {/* Headline text */}
+            <p className=" text-lg font-small leading-7 text-ink sm:text-2xl">
+              Want to see how your profile matches with market trends and opportunities?
+            </p>
+
+            {/* Primary button kept with your original color scheme */}
+            <div className="mt-4">
+              <Button
+                id="go-insight"
+                variant="primary"      
+                size="md"
+                onClick={onGoToInsight}
+                disabled={!canGoInsight}
+                tooltipWhenDisabled="Please select a target job first"
+                aria-label="View Personal Data Insights"
+                className="inline-flex items-center gap-2 rounded-xl px-5 py-3 text-base"
+              >
+                <span>View Personal Data Insights</span>  
+                <svg
+                  className="h-5 w-5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M5 12h14" />
+                  <path d="M13 5l7 7-7 7" />
+                </svg>
+              </Button>
+            </div>
+          </div>
+        </section>
+
 
         {/* Skill Roadmap Section */}
         <section id="skill-roadmap">
@@ -634,26 +677,7 @@ export default function Profile(): React.ReactElement {
 
           <VetGlossarySearch />
         </section>
-        <section id="insight-cta" className="mx-auto mt-10 max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
-  <div className="rounded-xl border border-border bg-white p-6 shadow-card">
-    <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
-      <p className="text-sm text-ink-soft">Want to see insights about your occupation?</p>
 
-      {/* English comments: disabled when no target job; show tooltip text in English */}
-      <Button
-        id="go-insight"
-        variant="primary"
-        size="md"
-        onClick={onGoToInsight}
-        disabled={!canGoInsight}
-        tooltipWhenDisabled="Please select a target job first"
-        aria-label="Go to Insight"
-      >
-        Go to Insight
-      </Button>
-    </div>
-  </div>
-</section>
       </div>
     </div>
   )

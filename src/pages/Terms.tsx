@@ -1,4 +1,3 @@
-// src/pages/TermsOfService.tsx
 /**
  * TermsOfServicePage (SkillBridge)
  * --------------------------------

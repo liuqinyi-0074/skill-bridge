@@ -1,4 +1,7 @@
-// src/components/analyzer/profile/SkillRoadMap.tsx
+// Skill roadmap editor with filtering, batch selection, and accessible actions
+// - Uses shared <Button /> component for consistent style and disabled tooltips
+// - Dates are optional; status derives from presence and comparison with today
+
 import React, { useMemo, useState } from "react";
 import {
   Plus,
@@ -16,6 +19,7 @@ import {
   Square,
   X,
 } from "lucide-react";
+import Button from "../ui/Button";
 import { skillCategories } from "../../data/skill.static";
 import { knowledgeCategories } from "../../data/knowledge.static";
 import { techSkillCategories } from "../../data/techskill.static";
@@ -36,9 +40,9 @@ export type SkillRoadmapItem = {
 type StatusInfo = {
   status: "not-started" | "in-progress" | "completed" | "not-scheduled";
   label: string;
-  color: string;
-  icon: typeof Clock;
-  sortOrder: number;
+  color: string; // Tailwind color classes for badge
+  icon: typeof Clock; // Icon component type
+  sortOrder: number; // Lower first in sorting
 };
 
 type SkillRoadMapProps = {
@@ -57,7 +61,7 @@ const parseDateStrict = (value?: string): Date | undefined => {
   return Number.isNaN(dt.getTime()) ? undefined : dt;
 };
 
-// Format date for UI
+// Format date for UI (fallback text if empty)
 const formatDateLabel = (value?: string): string => {
   const dt = parseDateStrict(value);
   return dt ? dt.toLocaleDateString() : "Not scheduled";
@@ -70,29 +74,36 @@ const normalizeInitial = (items?: SkillRoadmapItem[]): SkillRoadmapItem[] =>
     id: item.id ?? createId(),
   }));
 
-const SkillRoadMap: React.FC<SkillRoadMapProps> = ({
+export default function SkillRoadMap({
   initialSkills,
   onChange,
-}) => {
+}: SkillRoadMapProps): React.ReactElement {
   const [skills, setSkills] = useState<SkillRoadmapItem[]>(() =>
     normalizeInitial(initialSkills)
   );
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
+  const [showAddModal, setShowAddModal] = useState<boolean>(false);
+  const [showEditModal, setShowEditModal] = useState<boolean>(false);
   const [editingSkill, setEditingSkill] = useState<SkillRoadmapItem | null>(
     null
   );
   const [collapsed, setCollapsed] = useState<boolean>(false);
 
-  // New state for filtering, sorting, and batch operations
+  // Filters and batch selection state
   const [filterType, setFilterType] = useState<AbilityType | "all">("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [showBatchActions, setShowBatchActions] = useState(false);
+  const [showBatchActions, setShowBatchActions] = useState<boolean>(false);
 
   // Local form state for add/edit
-  const [formData, setFormData] = useState({
-    abilityType: "" as AbilityType | "",
+  const [formData, setFormData] = useState<{
+    abilityType: AbilityType | "";
+    category: string;
+    skill: string;
+    code: string;
+    startDate: string;
+    endDate: string;
+  }>({
+    abilityType: "",
     category: "",
     skill: "",
     code: "",
@@ -100,18 +111,19 @@ const SkillRoadMap: React.FC<SkillRoadMapProps> = ({
     endDate: "",
   });
 
-  // Propagate changes upward
-  const syncSkills = (next: SkillRoadmapItem[]) => {
+  /** Propagate to parent and local set */
+  const syncSkills = (next: SkillRoadmapItem[]): void => {
     setSkills(next);
     onChange?.(next);
   };
 
-  // Get category options based on ability type
+  /** Category options by type */
   const getCategoryOptions = (type: AbilityType | ""): string[] => {
     if (!type) return [];
     if (type === "skill") {
       return ["content", "process", "crossFunctional"];
-    } else if (type === "knowledge") {
+    }
+    if (type === "knowledge") {
       return [
         "management",
         "production",
@@ -123,28 +135,29 @@ const SkillRoadMap: React.FC<SkillRoadMapProps> = ({
         "public",
         "communication",
       ];
-    } else if (type === "tech") {
-      return [
-        "business",
-        "productivity",
-        "development",
-        "database",
-        "education",
-        "industry",
-        "network",
-        "system",
-        "security",
-        "communication",
-        "management",
-      ];
     }
-    return [];
+    // tech
+    return [
+      "business",
+      "productivity",
+      "development",
+      "database",
+      "education",
+      "industry",
+      "network",
+      "system",
+      "security",
+      "communication",
+      "management",
+    ];
   };
 
-  // Get skill options based on type and category
-  const getSkillOptions = (type: AbilityType | "", category: string) => {
+  /** Skill options by type + category */
+  const getSkillOptions = (
+    type: AbilityType | "",
+    category: string
+  ): Array<{ name: string; code?: string }> => {
     if (!type || !category) return [];
-
     if (type === "skill") {
       if (category === "content") return skillCategories.content;
       if (category === "process") return skillCategories.process;
@@ -155,15 +168,20 @@ const SkillRoadMap: React.FC<SkillRoadMapProps> = ({
         ];
       }
     } else if (type === "knowledge") {
-      return knowledgeCategories[category as keyof typeof knowledgeCategories] || [];
+      return (
+        knowledgeCategories[category as keyof typeof knowledgeCategories] || []
+      );
     } else if (type === "tech") {
       return techSkillCategories[category as keyof typeof techSkillCategories] || [];
     }
     return [];
   };
 
-  // Compute status for a single item with sort order
-  const getSkillStatus = (startDate?: string, endDate?: string): StatusInfo => {
+  /** Compute status from dates with sort priority */
+  const getSkillStatus = (
+    startDate?: string,
+    endDate?: string
+  ): StatusInfo => {
     const start = parseDateStrict(startDate);
     const end = parseDateStrict(endDate);
 
@@ -187,7 +205,8 @@ const SkillRoadMap: React.FC<SkillRoadMapProps> = ({
         icon: Clock,
         sortOrder: 3,
       };
-    } else if (today >= start && today <= end) {
+    }
+    if (today >= start && today <= end) {
       return {
         status: "in-progress",
         label: "In Progress",
@@ -195,35 +214,30 @@ const SkillRoadMap: React.FC<SkillRoadMapProps> = ({
         icon: TrendingUp,
         sortOrder: 2,
       };
-    } else {
-      return {
-        status: "completed",
-        label: "Date Passed",
-        color: "bg-accent/20 text-black border-accent",
-        icon: AlertCircle,
-        sortOrder: 1, // First priority
-      };
     }
+    return {
+      status: "completed",
+      label: "Date Passed",
+      color: "bg-accent/20 text-black border-accent",
+      icon: AlertCircle,
+      sortOrder: 1, // First priority
+    };
   };
 
-
-
-  // Filter and sort skills
+  /** Filter + sort list deterministically */
   const filteredAndSortedSkills = useMemo(() => {
     let result = [...skills];
 
-    // Apply filters
     if (filterType !== "all") {
-      result = result.filter(s => s.abilityType === filterType);
+      result = result.filter((s) => s.abilityType === filterType);
     }
     if (filterStatus !== "all") {
-      result = result.filter(s => {
+      result = result.filter((s) => {
         const status = getSkillStatus(s.startDate, s.endDate).status;
         return status === filterStatus;
       });
     }
 
-    // Sort by status priority: Date Passed → In Progress → Not Started → Not Scheduled
     result.sort((a, b) => {
       const statusA = getSkillStatus(a.startDate, a.endDate);
       const statusB = getSkillStatus(b.startDate, b.endDate);
@@ -233,18 +247,16 @@ const SkillRoadMap: React.FC<SkillRoadMapProps> = ({
     return result;
   }, [skills, filterType, filterStatus]);
 
-  // Summary counts for collapsed view
+  /** Summary counts for collapsed view */
   const summary = useMemo(() => {
     const total = skills.length;
 
-    // Count items with no schedule at all
     const notScheduled = skills.reduce((acc, s) => {
       const start = parseDateStrict(s.startDate);
       const end = parseDateStrict(s.endDate);
       return acc + (!start || !end ? 1 : 0);
     }, 0);
 
-    // Count in-progress and date-passed
     let inProgress = 0;
     let datePassed = 0;
     for (const s of skills) {
@@ -256,67 +268,74 @@ const SkillRoadMap: React.FC<SkillRoadMapProps> = ({
     return { total, notScheduled, inProgress, datePassed };
   }, [skills]);
 
-  // Handlers for add/edit/delete
-  const handleAddSkill = () => {
-    if (
-      formData.abilityType &&
-      formData.category &&
-      formData.skill &&
-      formData.startDate &&
-      formData.endDate
-    ) {
-      const newSkill: SkillRoadmapItem = {
-        id: createId(),
-        abilityType: formData.abilityType as AbilityType,
-        category: formData.category,
-        skill: formData.skill,
-        code: formData.code?.trim() ? formData.code.trim() : undefined,
-        startDate: formData.startDate || undefined,
-        endDate: formData.endDate || undefined,
-      };
-      syncSkills([...skills, newSkill]);
-      resetForm();
-      setShowAddModal(false);
-    }
+  // -----------------------
+  // CRUD handlers
+  // -----------------------
+  const canSubmitBase = Boolean(
+    formData.abilityType && formData.category && formData.skill
+  );
+
+  const canSubmitAdd = canSubmitBase;
+  const addDisabledReason = !formData.abilityType
+    ? "Please select ability type."
+    : !formData.category
+      ? "Please select category."
+      : !formData.skill
+        ? "Please select skill."
+        : undefined;
+
+  const canSubmitEdit = canSubmitBase;
+  const editDisabledReason = addDisabledReason;
+
+  const handleAddSkill = (): void => {
+    if (!canSubmitAdd) return;
+    const newSkill: SkillRoadmapItem = {
+      id: createId(),
+      abilityType: formData.abilityType as AbilityType,
+      category: formData.category,
+      skill: formData.skill,
+      code: formData.code?.trim() ? formData.code.trim() : undefined,
+      // Dates optional
+      startDate: formData.startDate || undefined,
+      endDate: formData.endDate || undefined,
+    };
+    syncSkills([...skills, newSkill]);
+    resetForm();
+    setShowAddModal(false);
   };
 
-  const handleEditSkill = () => {
-    if (
-      editingSkill &&
-      formData.abilityType &&
-      formData.category &&
-      formData.skill &&
-      formData.startDate &&
-      formData.endDate
-    ) {
-      syncSkills(
-        skills.map((skill) =>
-          skill.id === editingSkill.id
-            ? {
-                ...skill,
-                abilityType: formData.abilityType as AbilityType,
-                category: formData.category,
-                skill: formData.skill,
-                code: formData.code?.trim() ? formData.code.trim() : undefined,
-                startDate: formData.startDate || undefined,
-                endDate: formData.endDate || undefined,
-              }
-            : skill
-        )
-      );
-      resetForm();
-      setShowEditModal(false);
-      setEditingSkill(null);
-    }
+  const handleEditSkill = (): void => {
+    if (!editingSkill || !canSubmitEdit) return;
+    syncSkills(
+      skills.map((skill) =>
+        skill.id === editingSkill.id
+          ? {
+              ...skill,
+              abilityType: formData.abilityType as AbilityType,
+              category: formData.category,
+              skill: formData.skill,
+              code: formData.code?.trim() ? formData.code.trim() : undefined,
+              startDate: formData.startDate || undefined,
+              endDate: formData.endDate || undefined,
+            }
+          : skill
+      )
+    );
+    resetForm();
+    setShowEditModal(false);
+    setEditingSkill(null);
   };
 
-  const handleRemoveSkill = (id: string) => {
+  const handleRemoveSkill = (id: string): void => {
     syncSkills(skills.filter((skill) => skill.id !== id));
-    selectedIds.delete(id);
-    setSelectedIds(new Set(selectedIds));
+    if (selectedIds.has(id)) {
+      const next = new Set(selectedIds);
+      next.delete(id);
+      setSelectedIds(next);
+    }
   };
 
-  const openEditModal = (skill: SkillRoadmapItem) => {
+  const openEditModal = (skill: SkillRoadmapItem): void => {
     setEditingSkill(skill);
     setFormData({
       abilityType: skill.abilityType,
@@ -329,7 +348,7 @@ const SkillRoadMap: React.FC<SkillRoadMapProps> = ({
     setShowEditModal(true);
   };
 
-  const resetForm = () => {
+  const resetForm = (): void => {
     setFormData({
       abilityType: "",
       category: "",
@@ -340,54 +359,56 @@ const SkillRoadMap: React.FC<SkillRoadMapProps> = ({
     });
   };
 
+  // -----------------------
   // Batch operations
-  const toggleSelection = (id: string) => {
-    const newSelected = new Set(selectedIds);
-    if (newSelected.has(id)) {
-      newSelected.delete(id);
-    } else {
-      newSelected.add(id);
-    }
-    setSelectedIds(newSelected);
+  // -----------------------
+  const toggleSelection = (id: string): void => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedIds(next);
   };
 
-  const toggleSelectAll = () => {
+  const toggleSelectAll = (): void => {
     if (selectedIds.size === filteredAndSortedSkills.length) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(filteredAndSortedSkills.map(s => s.id)));
+      setSelectedIds(new Set(filteredAndSortedSkills.map((s) => s.id)));
     }
   };
 
-  const handleBatchDelete = () => {
-    if (confirm(`Delete ${selectedIds.size} selected skills?`)) {
-      syncSkills(skills.filter(s => !selectedIds.has(s.id)));
+  const handleBatchDelete = (): void => {
+    if (selectedIds.size === 0) return;
+    if (confirm(`Delete ${selectedIds.size} selected skill(s)?`)) {
+      syncSkills(skills.filter((s) => !selectedIds.has(s.id)));
       setSelectedIds(new Set());
       setShowBatchActions(false);
     }
   };
 
-  const resetFilters = () => {
+  const resetFilters = (): void => {
     setFilterType("all");
     setFilterStatus("all");
   };
 
-  // Responsive modal scaffold
+  // -----------------------
+  // Modal scaffold
+  // -----------------------
   const Modal = ({
     show,
     title,
     children,
   }: {
     show: boolean;
-    onClose: () => void;
     title: string;
     children: React.ReactNode;
-  }) => {
+  }): React.ReactElement | null => {
     if (!show) return null;
     return (
       <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-3 sm:p-4">
-        <div className="bg-white rounded-xl shadow-modal w-full max-h-[92vh] overflow-y-auto
-                        max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl">
+        <div
+          className="bg-white rounded-xl shadow-modal w-full max-h-[98vh] overflow-y-auto
+             max-w-sm sm:max-w-md md:max-w-lg lg:max-w-2xl xl:max-w-3xl">
           <div className="p-4 sm:p-6">
             <h2 className="text-xl sm:text-2xl font-heading font-bold text-ink mb-3 sm:mb-4">
               {title}
@@ -399,16 +420,23 @@ const SkillRoadMap: React.FC<SkillRoadMapProps> = ({
     );
   };
 
-  // Responsive form content
+  // -----------------------
+  // Form content for Add/Edit
+  // -----------------------
   const FormContent = ({
     onSubmit,
     submitLabel,
+    disabled,
+    disabledReason,
   }: {
     onSubmit: () => void;
     submitLabel: string;
-  }) => {
+    disabled: boolean;
+    disabledReason?: string;
+  }): React.ReactElement => {
     return (
       <div className="space-y-4">
+        {/* Ability type */}
         <div>
           <label className="block text-sm font-medium text-ink mb-2">
             Ability Type
@@ -433,6 +461,7 @@ const SkillRoadMap: React.FC<SkillRoadMapProps> = ({
           </select>
         </div>
 
+        {/* Category */}
         {formData.abilityType && (
           <div>
             <label className="block text-sm font-medium text-ink mb-2">
@@ -441,7 +470,12 @@ const SkillRoadMap: React.FC<SkillRoadMapProps> = ({
             <select
               value={formData.category}
               onChange={(e) =>
-                setFormData({ ...formData, category: e.target.value, skill: "", code: "" })
+                setFormData({
+                  ...formData,
+                  category: e.target.value,
+                  skill: "",
+                  code: "",
+                })
               }
               className="w-full p-2.5 sm:p-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40 text-ink"
             >
@@ -455,6 +489,7 @@ const SkillRoadMap: React.FC<SkillRoadMapProps> = ({
           </div>
         )}
 
+        {/* Skill */}
         {formData.category && (
           <div>
             <label className="block text-sm font-medium text-ink mb-2">
@@ -476,15 +511,18 @@ const SkillRoadMap: React.FC<SkillRoadMapProps> = ({
               className="w-full p-2.5 sm:p-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40 text-ink"
             >
               <option value="">Select Skill</option>
-              {getSkillOptions(formData.abilityType, formData.category).map((opt) => (
-                <option key={opt.code || opt.name} value={opt.name}>
-                  {opt.name}
-                </option>
-              ))}
+              {getSkillOptions(formData.abilityType, formData.category).map(
+                (opt) => (
+                  <option key={opt.code || opt.name} value={opt.name}>
+                    {opt.name}
+                  </option>
+                )
+              )}
             </select>
           </div>
         )}
 
+        {/* Dates are optional */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-ink mb-2">
@@ -515,24 +553,34 @@ const SkillRoadMap: React.FC<SkillRoadMapProps> = ({
           </div>
         </div>
 
+        {/* Actions */}
         <div className="flex flex-col sm:flex-row gap-3 pt-2 sm:pt-4">
-          <button
+          <Button
+            variant="primary"
+            size="md"
             onClick={onSubmit}
-            className="w-full sm:flex-1 bg-primary text-ink-invert py-2.5 sm:py-3 px-4 rounded-full font-semibold hover:bg-primary/90 transition shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+            disabled={disabled}
+            tooltipWhenDisabled={disabled ? disabledReason : undefined}
+            aria-label={submitLabel}
+            className="w-full sm:flex-1"
           >
             {submitLabel}
-          </button>
-          <button
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="md"
             onClick={() => {
               resetForm();
               setShowAddModal(false);
               setShowEditModal(false);
               setEditingSkill(null);
             }}
-            className="w-full sm:flex-1 bg-transparent text-ink border border-border py-2.5 sm:py-3 px-4 rounded-full font-semibold hover:bg-black/10 transition focus:outline-none focus:ring-2 focus:ring-black/20"
+            aria-label="Cancel"
+            className="w-full sm:flex-1"
           >
             Cancel
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -544,42 +592,49 @@ const SkillRoadMap: React.FC<SkillRoadMapProps> = ({
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between gap-3 sm:gap-4 items-start sm:items-center mb-6 sm:mb-8">
           <h3 className="text-xl sm:text-xl lg:text-xl font-heading font-bold text-ink">
-            
+            {/* Intentionally empty or you can put a small title */}
           </h3>
 
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
             {skills.length > 0 && (
               <>
-                <button
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => setShowBatchActions(!showBatchActions)}
-                  className={`flex items-center gap-1.5 sm:gap-2 border px-3 sm:px-4 py-1.5 sm:py-2 rounded-full hover:bg-black/5 transition shadow-sm focus:outline-none focus:ring-2 text-sm sm:text-base ${
-                    showBatchActions ? 'bg-primary/10 border-primary text-primary' : 'border-border text-ink'
-                  }`}
-                  title={showBatchActions ? "Exit batch mode" : "Enter batch mode"}
+                  aria-label={showBatchActions ? "Exit batch mode" : "Enter batch mode"}
+                  className={
+                    showBatchActions
+                      ? "border-primary text-primary bg-primary/10"
+                      : undefined
+                  }
                 >
-                  <CheckSquare size={18} />
+                  <CheckSquare size={18} className="mr-1.5" />
                   Batch
-                </button>
-                
-                <button
+                </Button>
+
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => setCollapsed((v) => !v)}
-                  className="flex items-center gap-1.5 sm:gap-2 border border-border text-ink px-3 sm:px-4 py-1.5 sm:py-2 rounded-full hover:bg-black/5 transition shadow-sm focus:outline-none focus:ring-2 focus:ring-black/20 text-sm sm:text-base"
-                  title={collapsed ? "Show all" : "Show less"}
+                  aria-label={collapsed ? "Show all" : "Show less"}
                 >
-                  {collapsed ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+                  {collapsed ? <ChevronDown size={18} className="mr-1.5" /> : <ChevronUp size={18} className="mr-1.5" />}
                   {collapsed ? "Show all" : "Show less"}
-                </button>
+                </Button>
               </>
             )}
 
-            <button
+            <Button
+              variant="primary"
+              size="md"
               onClick={() => setShowAddModal(true)}
-              className="flex items-center gap-1.5 sm:gap-2 bg-primary text-ink-invert px-4 sm:px-6 py-2 sm:py-3 rounded-full hover:bg-primary/90 transition shadow-card font-semibold focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm sm:text-base"
+              aria-label="Add new skill"
             >
-              <Plus size={18} className="sm:hidden" />
-              <Plus size={20} className="hidden sm:block" />
+              <Plus size={18} className="sm:hidden mr-1" />
+              <Plus size={20} className="hidden sm:inline-block mr-1" />
               Add Skill
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -590,13 +645,17 @@ const SkillRoadMap: React.FC<SkillRoadMapProps> = ({
               <Filter size={18} className="text-primary" />
               <h3 className="font-semibold text-ink">Filters</h3>
             </div>
-            
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="block text-xs font-medium text-ink-soft mb-1">Type</label>
+                <label className="block text-xs font-medium text-ink-soft mb-1">
+                  Type
+                </label>
                 <select
                   value={filterType}
-                  onChange={(e) => setFilterType(e.target.value as AbilityType | "all")}
+                  onChange={(e) =>
+                    setFilterType(e.target.value as AbilityType | "all")
+                  }
                   className="w-full p-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
                 >
                   <option value="all">All Types</option>
@@ -606,9 +665,10 @@ const SkillRoadMap: React.FC<SkillRoadMapProps> = ({
                 </select>
               </div>
 
-
               <div>
-                <label className="block text-xs font-medium text-ink-soft mb-1">Status</label>
+                <label className="block text-xs font-medium text-ink-soft mb-1">
+                  Status
+                </label>
                 <select
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value)}
@@ -623,14 +683,17 @@ const SkillRoadMap: React.FC<SkillRoadMapProps> = ({
               </div>
             </div>
 
-            {(filterType !== "all" ||  filterStatus !== "all") && (
-              <button
+            {(filterType !== "all" || filterStatus !== "all") && (
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={resetFilters}
-                className="mt-3 text-sm text-primary hover:underline flex items-center gap-1"
+                aria-label="Clear all filters"
+                className="mt-3 inline-flex items-center gap-1 text-primary hover:underline"
               >
                 <X size={14} />
                 Clear all filters
-              </button>
+              </Button>
             )}
           </div>
         )}
@@ -639,22 +702,27 @@ const SkillRoadMap: React.FC<SkillRoadMapProps> = ({
         {showBatchActions && selectedIds.size > 0 && (
           <div className="bg-primary/10 border border-primary rounded-xl p-4 mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <span className="text-sm font-medium text-ink">
-              {selectedIds.size} skill{selectedIds.size > 1 ? 's' : ''} selected
+              {selectedIds.size} skill{selectedIds.size > 1 ? "s" : ""} selected
             </span>
             <div className="flex gap-2">
-              <button
+              <Button
+                variant="primary"
+                size="sm"
                 onClick={handleBatchDelete}
-                className="flex items-center gap-1.5 bg-red-600 text-white px-4 py-2 rounded-full hover:bg-red-700 transition text-sm font-semibold"
+                aria-label="Delete selected skills"
+                className="bg-red-600 hover:bg-red-700"
               >
-                <Trash2 size={16} />
+                <Trash2 size={16} className="mr-1.5" />
                 Delete Selected
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => setSelectedIds(new Set())}
-                className="px-4 py-2 border border-border rounded-full hover:bg-black/5 transition text-sm"
+                aria-label="Cancel batch selection"
               >
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
         )}
@@ -719,12 +787,14 @@ const SkillRoadMap: React.FC<SkillRoadMapProps> = ({
                 <p className="text-ink-soft mb-4 sm:mb-6 text-sm sm:text-base">
                   Start building your learning roadmap by adding your first skill
                 </p>
-                <button
+                <Button
+                  variant="primary"
+                  size="md"
                   onClick={() => setShowAddModal(true)}
-                  className="bg-primary text-ink-invert px-5 sm:px-6 py-2 sm:py-2.5 rounded-full hover:bg-primary/90 transition font-semibold shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm sm:text-base"
+                  aria-label="Add your first skill"
                 >
                   Add Your First Skill
-                </button>
+                </Button>
               </div>
             ) : (
               <div className="bg-white rounded-xl shadow-card border border-border">
@@ -732,29 +802,38 @@ const SkillRoadMap: React.FC<SkillRoadMapProps> = ({
                 <div className="px-4 py-3 border-b border-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 bg-gray-50/50">
                   <div className="flex items-center gap-2 text-sm text-ink-soft">
                     <ArrowUpDown size={16} />
-                    <span>Sorted: Date Passed → In Progress → Not Started → Not Scheduled</span>
+                    <span>
+                      Sorted: Date Passed → In Progress → Not Started → Not Scheduled
+                    </span>
                   </div>
                   {showBatchActions && (
-                    <button
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={toggleSelectAll}
-                      className="flex items-center gap-1.5 text-sm text-primary hover:underline"
+                      aria-label={
+                        selectedIds.size === filteredAndSortedSkills.length
+                          ? "Deselect all"
+                          : "Select all"
+                      }
+                      className="text-primary hover:underline"
                     >
                       {selectedIds.size === filteredAndSortedSkills.length ? (
                         <>
-                          <CheckSquare size={16} />
+                          <CheckSquare size={16} className="mr-1" />
                           Deselect All
                         </>
                       ) : (
                         <>
-                          <Square size={16} />
+                          <Square size={16} className="mr-1" />
                           Select All
                         </>
                       )}
-                    </button>
+                    </Button>
                   )}
                 </div>
 
-                {/* Scrollable skills list - max height with scroll */}
+                {/* Scrollable list */}
                 <div className="max-h-[600px] overflow-y-auto">
                   <div className="p-3 sm:p-4 space-y-3">
                     {filteredAndSortedSkills.map((skill) => {
@@ -769,15 +848,16 @@ const SkillRoadMap: React.FC<SkillRoadMapProps> = ({
                         <div
                           key={skill.id}
                           className={`bg-white rounded-xl border p-4 sm:p-5 hover:shadow-lg transition ${
-                            isSelected ? 'border-primary bg-primary/5' : 'border-border'
+                            isSelected ? "border-primary bg-primary/5" : "border-border"
                           }`}
                         >
                           <div className="flex items-start gap-3 sm:gap-4">
-                            {/* Checkbox for batch selection */}
+                            {/* Batch checkbox */}
                             {showBatchActions && (
                               <button
                                 onClick={() => toggleSelection(skill.id)}
                                 className="mt-1 flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-primary/40 rounded"
+                                aria-label={isSelected ? "Unselect skill" : "Select skill"}
                               >
                                 {isSelected ? (
                                   <CheckSquare size={20} className="text-primary" />
@@ -788,12 +868,12 @@ const SkillRoadMap: React.FC<SkillRoadMapProps> = ({
                             )}
 
                             <div className="flex-1 min-w-0">
-                              {/* Skill name as main title */}
+                              {/* Title */}
                               <h3 className="text-base sm:text-lg lg:text-xl font-heading font-bold text-ink leading-snug whitespace-normal break-words">
                                 {skill.skill}
                               </h3>
 
-                              {/* Meta information */}
+                              {/* Meta */}
                               <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs sm:text-sm text-ink-soft">
                                 <span className="capitalize font-medium">
                                   {skill.abilityType}
@@ -819,25 +899,30 @@ const SkillRoadMap: React.FC<SkillRoadMapProps> = ({
                               </div>
                             </div>
 
-                            {/* Action buttons */}
+                            {/* Row actions */}
                             {!showBatchActions && (
                               <div className="flex gap-1.5 sm:gap-2 flex-shrink-0">
-                                <button
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
                                   onClick={() => openEditModal(skill)}
-                                  className="p-1.5 sm:p-2 text-primary hover:bg-primary/10 rounded-lg transition focus:outline-none focus:ring-2 focus:ring-primary/40"
-                                  title="Edit skill"
+                                  aria-label="Edit skill"
+                                  tooltipWhenDisabled={undefined}
+                                  className="p-1.5 sm:p-2 text-primary hover:bg-primary/10 rounded-lg"
                                 >
                                   <Edit2 size={18} className="sm:hidden" />
                                   <Edit2 size={20} className="hidden sm:block" />
-                                </button>
-                                <button
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
                                   onClick={() => handleRemoveSkill(skill.id)}
-                                  className="p-1.5 sm:p-2 text-red-600 hover:bg-red-50 rounded-lg transition focus:outline-none focus:ring-2 focus:ring-red-300"
-                                  title="Remove skill"
+                                  aria-label="Remove skill"
+                                  className="p-1.5 sm:p-2 text-red-600 hover:bg-red-50 rounded-lg"
                                 >
                                   <Trash2 size={18} className="sm:hidden" />
                                   <Trash2 size={20} className="hidden sm:block" />
-                                </button>
+                                </Button>
                               </div>
                             )}
                           </div>
@@ -847,25 +932,31 @@ const SkillRoadMap: React.FC<SkillRoadMapProps> = ({
                   </div>
                 </div>
 
-                {/* Results count footer */}
+                {/* Results footer */}
                 {filteredAndSortedSkills.length > 0 && (
-                  <div className="px-4 py-3 border-t border-border bg-gray-50/50 text-center text-sm text-ink-soft">
-                    Showing {filteredAndSortedSkills.length} of {skills.length} skill{skills.length !== 1 ? 's' : ''}
+                  <div className="px-4 py-3 border-top border-border bg-gray-50/50 text-center text-sm text-ink-soft">
+                    Showing {filteredAndSortedSkills.length} of {skills.length} skill
+                    {skills.length !== 1 ? "s" : ""}
                   </div>
                 )}
 
-                {/* No results message */}
+                {/* Empty after filter */}
                 {filteredAndSortedSkills.length === 0 && skills.length > 0 && (
                   <div className="p-8 text-center">
                     <Filter size={48} className="mx-auto mb-3 text-ink-soft/40" />
-                    <h3 className="text-lg font-semibold text-ink mb-2">No skills match your filters</h3>
+                    <h3 className="text-lg font-semibold text-ink mb-2">
+                      No skills match your filters
+                    </h3>
                     <p className="text-ink-soft mb-4">Try adjusting your filter criteria</p>
-                    <button
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={resetFilters}
-                      className="text-sm text-primary hover:underline"
+                      aria-label="Clear all filters"
+                      className="text-primary hover:underline"
                     >
                       Clear all filters
-                    </button>
+                    </Button>
                   </div>
                 )}
               </div>
@@ -873,25 +964,26 @@ const SkillRoadMap: React.FC<SkillRoadMapProps> = ({
           </>
         )}
 
-        {/* Modals */}
-        <Modal
-          show={showAddModal}
-          onClose={() => setShowAddModal(false)}
-          title="Add New Skill"
-        >
-          <FormContent onSubmit={handleAddSkill} submitLabel="Add Skill" />
+        {/* Add Modal */}
+        <Modal show={showAddModal} title="Add New Skill">
+          <FormContent
+            onSubmit={handleAddSkill}
+            submitLabel="Add Skill"
+            disabled={!canSubmitAdd}
+            disabledReason={addDisabledReason}
+          />
         </Modal>
 
-        <Modal
-          show={showEditModal}
-          onClose={() => setShowEditModal(false)}
-          title="Edit Skill"
-        >
-          <FormContent onSubmit={handleEditSkill} submitLabel="Update Skill" />
+        {/* Edit Modal */}
+        <Modal show={showEditModal} title="Edit Skill">
+          <FormContent
+            onSubmit={handleEditSkill}
+            submitLabel="Update Skill"
+            disabled={!canSubmitEdit}
+            disabledReason={editDisabledReason}
+          />
         </Modal>
       </div>
     </div>
   );
-};
-
-export default SkillRoadMap;
+}

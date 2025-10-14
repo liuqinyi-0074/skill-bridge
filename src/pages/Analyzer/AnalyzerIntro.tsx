@@ -1,5 +1,4 @@
-﻿// src/pages/Analyzer/AnalyzerIntro.tsx
-// Intro page for the Analyzer wizard.
+﻿// Intro page for the Analyzer wizard.
 // - Uses a full-bleed hero and feature sections.
 // - CTA navigates to the first data-collection step via a static path.
 
@@ -165,7 +164,7 @@ export default function AnalyzerIntro(): React.ReactElement {
             Four simple steps to get a tailored career development report.
           </p>
 
-          {/* Reusable, headerless grid. We pass labelledById to link region to the H2 above. */}
+          {/* pass labelledById to link region to the H2 above. */}
           <HowItWorksGrid steps={steps} labelledById="how-it-works" className="mt-6" />
         </section>
 

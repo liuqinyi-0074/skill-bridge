@@ -1,7 +1,7 @@
-// src/components/tutorial/Tutorial.tsx
 // Reusable tutorial/onboarding component with spotlight effect
-// Uses project Button component (primary color). Skip keeps original gray style.
-// Tooltip centered when target missing; throttled highlight updates.
+// - Responsive tooltip: bottom sheet on mobile, centered on tablet, smart placement on desktop
+// - Uses project Button component (primary color). Skip keeps original gray style.
+// - Tooltip centered when target missing; throttled highlight updates; ResizeObserver for smoothness.
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
@@ -10,10 +10,10 @@ import Button from "../ui/Button";
 /** Single tutorial step definition */
 export interface TutorialStep {
   id: string;
-  target: string;
+  target: string; // CSS selector of the element to highlight
   title: string;
   content: string;
-  placement?: "top" | "bottom" | "left" | "right";
+  placement?: "top" | "bottom" | "left" | "right"; // reserved for future fine-tuning
 }
 
 /** Props for Tutorial component */
@@ -22,15 +22,29 @@ export interface TutorialProps {
   isOpen: boolean;
   onClose: () => void;
   zIndex?: number;
-  headerOffset?: number;
+  headerOffset?: number; // pixels to avoid fixed headers when auto-centering
 }
 
 /** Rect for spotlight box */
-type RectLike = { top: number; left: number; width: number; height: number; bottom: number; right: number };
+type RectLike = {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+  bottom: number;
+  right: number;
+};
 
 /** Convert DOMRect → RectLike */
 function toRectLike(r: DOMRect): RectLike {
-  return { top: r.top, left: r.left, width: r.width, height: r.height, bottom: r.bottom, right: r.right };
+  return {
+    top: r.top,
+    left: r.left,
+    width: r.width,
+    height: r.height,
+    bottom: r.bottom,
+    right: r.right,
+  };
 }
 
 /** Detect scrollable elements */
@@ -83,7 +97,7 @@ function centerInAllScrollers(el: Element, headerOffset: number): void {
   }
 }
 
-/** Get element if visible */
+/** Get element if visible and measurable */
 function resolveTarget(selector: string): Element | null {
   if (!selector) return null;
   const el = document.querySelector(selector);
@@ -102,8 +116,8 @@ export default function Tutorial({
 }: TutorialProps): React.ReactElement | null {
   const [currentStep, setCurrentStep] = useState<number>(0);
   const [highlightRect, setHighlightRect] = useState<RectLike | null>(null);
- 
   const rafRef = useRef<number | null>(null);
+  const roRef = useRef<ResizeObserver | null>(null);
 
   const step = steps[currentStep];
   const totalSteps = steps.length;
@@ -117,17 +131,16 @@ export default function Tutorial({
     const el = resolveTarget(step.target);
     if (!el) {
       setHighlightRect(null);
-
       return;
     }
 
     centerInAllScrollers(el, headerOffset);
+    // Double RAF to settle layout shifts before measuring
     requestAnimationFrame(() => {
       const r1 = (el as HTMLElement).getBoundingClientRect();
       requestAnimationFrame(() => {
         const r2 = (el as HTMLElement).getBoundingClientRect();
         setHighlightRect(toRectLike(r2.width > 0 ? r2 : r1));
- 
       });
     });
   }, [step, headerOffset]);
@@ -160,22 +173,38 @@ export default function Tutorial({
     return () => clearTimeout(t);
   }, [isOpen, step, updateHighlight]);
 
-  /** Scroll / resize / mutation observers (throttled) */
+  /** Scroll / resize / DOM mutation observers (throttled) */
   useEffect(() => {
     if (!isOpen) return;
+
     const onScroll = (): void => scheduleUpdate();
     const onResize = (): void => scheduleUpdate();
     window.addEventListener("resize", onResize);
     window.addEventListener("scroll", onScroll, { passive: true });
+
     const obs = new MutationObserver(() => scheduleUpdate());
     obs.observe(document.body, { subtree: true, childList: true, attributes: true });
+
+    // Observe size changes of the target itself for smoother updates
+    if (step?.target && "ResizeObserver" in window) {
+      const el = resolveTarget(step.target);
+      if (el) {
+        roRef.current = new ResizeObserver(() => scheduleUpdate());
+        roRef.current.observe(el as Element);
+      }
+    }
+
     return () => {
       window.removeEventListener("resize", onResize);
       window.removeEventListener("scroll", onScroll);
       obs.disconnect();
+      if (roRef.current) {
+        roRef.current.disconnect();
+        roRef.current = null;
+      }
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     };
-  }, [isOpen, scheduleUpdate]);
+  }, [isOpen, step, scheduleUpdate]);
 
   /** Keyboard shortcuts */
   useEffect(() => {
@@ -189,39 +218,86 @@ export default function Tutorial({
     return () => document.removeEventListener("keydown", onKey);
   }, [isOpen, handleNext, handlePrev, handleSkip]);
 
-  /** Tooltip position (kept same visual style) */
+  /** Responsive tooltip placement and sizing */
   const getTooltipStyle = useCallback((): React.CSSProperties => {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    const isMobile = vw < 640;
-    const isTablet = vw >= 640 && vw < 1024;
+    const isMobile = vw < 640; // < sm
+    const isTablet = vw >= 640 && vw < 1024; // sm..lg
     const base: React.CSSProperties = { position: "fixed", zIndex: (zIndex || 9999) + 2 };
 
+    // When target not found: center with responsive clamp width
     if (!highlightRect) {
       return {
         ...base,
         top: "50%",
         left: "50%",
         transform: "translate(-50%, -50%)",
-        width: "min(450px, calc(100vw - 40px))",
-        maxHeight: "70vh",
+        width: "clamp(280px, 92vw, 520px)",
+        maxHeight: "min(80vh, 640px)",
       };
     }
 
-    if (isMobile)
-      return { ...base, bottom: 16, left: 16, right: 16, width: "auto", maxHeight: "40vh" };
-    if (isTablet)
-      return { ...base, bottom: 20, left: "50%", transform: "translateX(-50%)", width: "min(500px,calc(100%-60px))" };
+    // Mobile: bottom sheet with gutters
+    if (isMobile) {
+      return {
+        ...base,
+        left: 12,
+        right: 12,
+        bottom: 12,
+        width: "auto",
+        maxHeight: "min(55vh, 460px)",
+        borderRadius: 12,
+      };
+    }
 
+    // Tablet: centered card
+    if (isTablet) {
+      return {
+        ...base,
+        top: "50%",
+        left: "50%",
+        transform: "translate(-50%, -50%)",
+        width: "clamp(360px, 70vw, 560px)",
+        maxHeight: "min(70vh, 560px)",
+        borderRadius: 14,
+      };
+    }
+
+    // Desktop: try below or above target, else center
     const pad = 24;
-    const w = Math.min(450, vw - 40);
+    const w = "clamp(380px, 40vw, 640px)";
     const spaceTop = highlightRect.top;
     const spaceBottom = vh - highlightRect.bottom;
-    if (spaceBottom > 220)
-      return { ...base, top: highlightRect.bottom + pad, left: "50%", transform: "translateX(-50%)", width: w };
-    if (spaceTop > 220)
-      return { ...base, bottom: vh - highlightRect.top + pad, left: "50%", transform: "translateX(-50%)", width: w };
-    return { ...base, top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: w };
+
+    if (spaceBottom > 260) {
+      return {
+        ...base,
+        top: highlightRect.bottom + pad,
+        left: "50%",
+        transform: "translateX(-50%)",
+        width: w,
+        maxHeight: "min(60vh, 560px)",
+      };
+    }
+    if (spaceTop > 260) {
+      return {
+        ...base,
+        bottom: vh - highlightRect.top + pad,
+        left: "50%",
+        transform: "translateX(-50%)",
+        width: w,
+        maxHeight: "min(60vh, 560px)",
+      };
+    }
+    return {
+      ...base,
+      top: "50%",
+      left: "50%",
+      transform: "translate(-50%,-50%)",
+      width: w,
+      maxHeight: "min(70vh, 600px)",
+    };
   }, [highlightRect, zIndex]);
 
   if (!isOpen || !step) return null;
@@ -236,7 +312,8 @@ export default function Tutorial({
         style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.7)", pointerEvents: "auto" }}
         onClick={handleSkip}
       />
-      {/* Spotlight */}
+
+      {/* Spotlight without shadow */}
       {highlightRect && (
         <div
           style={{
@@ -247,39 +324,40 @@ export default function Tutorial({
             height: highlightRect.height + 16,
             border: "3px solid #3b82f6",
             borderRadius: 8,
-            boxShadow: "0 0 0 4px rgba(59,130,246,0.2)",
             pointerEvents: "none",
-            transition: "all 0.3s ease",
+            transition: "all 0.25s ease",
+            boxShadow: "none", // no shadow on selected area
           }}
         />
       )}
-      {/* Tooltip */}
+
+      {/* Tooltip card */}
       <div style={{ ...getTooltipStyle(), pointerEvents: "auto" }}>
         <div className="bg-white rounded-xl shadow-2xl border border-slate-200 flex flex-col h-full overflow-hidden">
           {/* Content */}
           <div className="flex-1 overflow-y-auto p-4 sm:p-5">
-            <div className="flex items-start justify-between mb-3 gap-3">
-              <div className="flex-1 min-w-0">
-                <h3 className="text-base sm:text-lg font-bold text-slate-900 mb-1">{step.title}</h3>
-                <div className="text-xs sm:text-sm text-slate-500">
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <h3 className="mb-1 text-base font-bold text-slate-900 sm:text-lg">{step.title}</h3>
+                <div className="text-xs text-slate-500 sm:text-sm">
                   Step {currentStep + 1} of {totalSteps}
                 </div>
               </div>
               <button
                 onClick={handleSkip}
-                className="flex-shrink-0 text-slate-400 hover:text-slate-600 transition-colors p-1"
+                className="flex-shrink-0 rounded p-1 text-slate-400 transition-colors hover:text-slate-600"
                 aria-label="Close"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
-            <p className="text-sm sm:text-base text-slate-700 leading-relaxed">{step.content}</p>
+            <p className="text-sm leading-relaxed text-slate-700 sm:text-base">{step.content}</p>
           </div>
 
           {/* Footer buttons */}
-          <div className="flex-shrink-0 border-t border-slate-200 p-3 sm:p-4 bg-slate-50">
+          <div className="flex-shrink-0 border-t border-slate-200 bg-slate-50 p-3 sm:p-4">
             <div className="flex items-center justify-between gap-3">
               <Button
                 variant="primary"
@@ -291,10 +369,9 @@ export default function Tutorial({
                 Prev
               </Button>
 
-              {/* Skip retains original gray style */}
               <button
                 onClick={handleSkip}
-                className="px-3 sm:px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-700 transition-colors"
+                className="px-3 py-2 text-sm font-medium text-slate-500 transition-colors hover:text-slate-700 sm:px-4"
                 aria-label="Skip tutorial"
               >
                 Skip

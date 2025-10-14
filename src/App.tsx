@@ -1,4 +1,11 @@
 // src/App.tsx
+// App shell with route-level code splitting, layout wrapper, and a simple password gate.
+// Notes:
+// - Password gate persists "unlocked" to localStorage so reloads do not ask again.
+// - This is a UX gate only. Do not treat it as real security.
+// - Scroll-to-top on route changes (except hash navigation).
+// - Analyzer state resets on browser unload to avoid stale flows.
+
 import { Suspense, lazy, useEffect, useMemo, useState } from "react"
 import { useNavigate, Routes, Route, Navigate, useLocation } from "react-router-dom"
 import MainLayout from "./layouts/MainLayout"
@@ -31,31 +38,30 @@ function Spinner(): React.ReactElement {
 
 /**
  * PasswordGate
- * ------------
- * Frontend guard that asks for a password before rendering the real app.
- *
- * Modified behavior:
- * - Removed localStorage persistence for unlocked state
- * - Password is required on every browser session/page reload
- * - Unlocked state exists only in component memory during current session
- *
- * How it works:
- * - If PASSWORD is missing, we skip the gate to avoid accidental lockouts.
- * - If present, we show a simple form. On success we unlock the app.
- * - On reload or reopening the browser, the gate will appear again.
- *
- * Security note:
- * - This is a UX gate. For real security, verify on a server or use Basic Auth.
+ * Frontend-only password form. If `VITE_SITE_PASSWORD` is set, the app
+ * requires the correct password once per browser (persisted via localStorage).
+ * This is not secure. It is meant for prelaunch UX only.
  */
 function PasswordGate(props: { children: React.ReactElement }): React.ReactElement {
   const shouldGate = useMemo<boolean>(() => {
     return typeof PASSWORD === "string" && PASSWORD.trim().length > 0
   }, [])
-   const navigate = useNavigate()
+
+  const navigate = useNavigate()
   const [input, setInput] = useState<string>("")
   const [error, setError] = useState<string>("")
-  // No localStorage check - defaults to locked state on each session
-  const [unlocked, setUnlocked] = useState<boolean>(() => !shouldGate)
+
+  // Versioned key so changing PASSWORD invalidates previous unlocks.
+  const vaultKey = useMemo(
+    () => (shouldGate ? `site:pw:unlocked:${PASSWORD}` : "site:pw:skip"),
+    [shouldGate]
+  )
+
+  // Read initial unlock state from localStorage.
+  const [unlocked, setUnlocked] = useState<boolean>(() => {
+    if (!shouldGate) return true
+    return localStorage.getItem(vaultKey) === "1"
+  })
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
     e.preventDefault()
@@ -65,8 +71,10 @@ function PasswordGate(props: { children: React.ReactElement }): React.ReactEleme
       return
     }
     if (input === PASSWORD) {
+      localStorage.setItem(vaultKey, "1")
       setUnlocked(true)
       setError("")
+      navigate("/")
     } else {
       setError("Incorrect password")
     }
@@ -122,11 +130,13 @@ export default function App(): React.ReactElement {
   const { pathname, hash } = useLocation()
   const dispatch = useAppDispatch()
 
+  // Scroll to top on route change unless navigating to an anchor.
   useEffect(() => {
     if (hash) return
     window.scrollTo({ top: 0, left: 0, behavior: "auto" })
   }, [pathname, hash])
 
+  // Reset analyzer on unload to avoid stale state when reopening the app.
   useEffect(() => {
     const handleBeforeUnload = (): void => {
       dispatch(resetAnalyzer())
@@ -139,7 +149,7 @@ export default function App(): React.ReactElement {
 
   return (
     <PasswordGate>
-      <ErrorBoundary feedbackHref="/feedback" onError={(e) => console.error(e)}>
+      <ErrorBoundary feedbackHref="/feedback">
         <Suspense fallback={<Spinner />}>
           <Routes>
             <Route path="/" element={<MainLayout />}>

@@ -1,4 +1,3 @@
-// src/components/layout/Header.tsx
 /**
  * Responsive Site Header with lazy GSAP loading.
  * - GSAP and ScrollTrigger are loaded on demand to keep initial bundle small.

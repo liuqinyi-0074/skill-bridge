@@ -1,4 +1,3 @@
-// frontend/src/types/states.ts
 /**
  * Australian States and Territories Configuration
  * 

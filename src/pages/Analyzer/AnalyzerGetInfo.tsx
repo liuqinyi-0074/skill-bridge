@@ -274,6 +274,12 @@ function PageBody(): React.ReactElement {
           label="View Tutorial"
           placement="inline"
           variant="outline"
+          ariaLabel="View Get Info Tutorial"
+          className="z-50"
+          headerOffset={64}
+          tutorialHeaderOffset={64}
+          autoOpenOnceKey="getInfo:tutorial:v1"
+          autoOpenDelayMs={300}
 
         />
 
@@ -379,7 +385,7 @@ function PageBody(): React.ReactElement {
           Back
         </Button>
 
-        <div className="relative group">
+        <div id="next-button" className="relative group">
           <Button
             variant="primary"
             size="md"

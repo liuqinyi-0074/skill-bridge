@@ -1,4 +1,3 @@
-// src/layouts/AnalyzerLayout.tsx
 // Layout renders ProgressBar, an optional centered page header (Title + Help),
 // a right-aligned actions slot, page content, and the SelectedSummaryDock.
 //

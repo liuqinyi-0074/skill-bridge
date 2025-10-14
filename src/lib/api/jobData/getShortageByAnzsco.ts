@@ -1,4 +1,3 @@
-// frontend/src/lib/api/jobData/getShortageByAnzsco.ts
 import { postJSON } from "../apiClient";
 import type { ShortageRes } from "../../../types/shortage";
 

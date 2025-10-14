@@ -1,4 +1,3 @@
-// src/pages/Analyzer/AnalyzerSkillGap.tsx
 // Skill Gap analysis page for the Analyzer workflow
 // Displays skills user is missing for their target occupation
 // Export PDF button hidden on mobile devices

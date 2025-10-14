@@ -1,5 +1,3 @@
-// src/pages/Home/Home.tsx
-// English comments only inside code:
 // - Background image is 20% taller than the hero (so 1/5 remains visible).
 // - No CSS mask: we overlay a transparent→white gradient on top of the image,
 //   which visually fades the edges to the page background (white).
@@ -8,13 +6,10 @@
 import Hero from "../components/Hero"
 import FeatureSection from "../components/home/FeatureSection"
 import FeatureCard from "../components/FeatureCard"
-
 import bridgeUrl from "../assets/image/bridge.png"
 import analyzeSvg from "../assets/image/analyze.svg"
 import dataSvg from "../assets/image/data.svg"
 import profileSvg from "../assets/image/profie.svg"
-
-
 export default function Home() {
   // Shared sizes
   const HEADER_H = 64 // must match Hero.headerHeight
@@ -28,6 +23,7 @@ export default function Home() {
   const FADE_START = "78%" // start fading here (visible above)
   const FADE_END = "100%"  // fully white at the very bottom
 
+  
   return (
     <main className="relative min-h-screen bg-white">
       {/* Background image layer (20% taller than the hero) */}

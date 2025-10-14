@@ -1,4 +1,3 @@
-// frontend/src/lib/api/glossary/getDetailByKeyword.ts
 // API call to fetch VET glossary term details by keyword.
 
 import { getJSON } from "../apiClient";

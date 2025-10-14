@@ -1,6 +1,5 @@
-// src/pages/PrivacyPolicy.tsx
 /**
- * PrivacyPolicyPage (Local-Only, No-Storage version)
+ * PrivacyPolicyPage 
  * --------------------------------------------------
  * Drop-in React component for a /privacy route.
  * Matches StrangerThink’s model: no website entity, no server storage,

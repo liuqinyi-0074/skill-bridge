@@ -1,4 +1,3 @@
-// src/pages/FeedbackPage.tsx
 /**
  * Feedback page (internal form)
  * - Validates inputs, maps to API schema, posts to /contact.
