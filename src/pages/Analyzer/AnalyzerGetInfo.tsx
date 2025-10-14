@@ -363,7 +363,7 @@ function PageBody(): React.ReactElement {
       {/* Industries (Q3) */}
       <section className="mt-8" data-section="industries">
         <SelectQuestion
-          title="3. Which industries are you interested in?"
+          title="3. What are your past occupations?"
           options={industryOptions}
           value={interests}
           onChange={setInterests}
