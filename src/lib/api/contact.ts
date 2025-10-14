@@ -1,4 +1,3 @@
-// src/lib/api/contact.ts
 import { postJSON } from "./apiClient";
 import type { FeedbackReq, FeedbackRes } from "../../types/feedback";
 
@@ -9,7 +8,18 @@ import type { FeedbackReq, FeedbackRes } from "../../types/feedback";
  */
 export async function sendFeedback(body: FeedbackReq): Promise<FeedbackRes> {
   // Call the shared POST helper; response shape may vary across environments.
-  const raw = await postJSON<FeedbackReq, unknown>("/contact", body);
+  const raw = await postJSON<FeedbackReq, unknown>("/api/contact", body);
+
+  // Some backends reply with HTTP 204 (no content) or plain "OK".
+  if (raw == null) {
+    return { status: "ok", id: "" };
+  }
+  if (typeof raw === "string") {
+    const normalized = raw.trim().toLowerCase();
+    if (normalized === "" || normalized === "ok" || normalized === "success") {
+      return { status: "ok", id: "" };
+    }
+  }
 
   // Defensive conversion to plain object.
   const obj =
