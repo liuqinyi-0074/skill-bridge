@@ -281,7 +281,7 @@ function PageBody(): React.ReactElement {
       {/* Role search (Q1) */}
       <section className="mt-8" data-section="role-search">
         <h2 className="text-xl font-semibold text-ink mb-4">
-          1. What was your previous occupation??
+          1. What was your previous occupation?
         </h2>
 
         <SearchComboWithResults
@@ -363,7 +363,7 @@ function PageBody(): React.ReactElement {
       {/* Industries (Q3) */}
       <section className="mt-8" data-section="industries">
         <SelectQuestion
-          title="3. What are your past occupations?"
+          title="3. Which industries are you interested in?"
           options={industryOptions}
           value={interests}
           onChange={setInterests}
