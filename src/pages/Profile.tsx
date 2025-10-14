@@ -1,14 +1,13 @@
-// src/pages/Profile.tsx
 // Profile page with tutorial matching Insight page style
 // - Uses TutorialLauncher in the header (top-right corner)
 // - Export PDF button always visible (mobile + desktop)
 // - Shows skill roadmap from unmatched abilities
 // - Auto-fetches training advice
 // - VET glossary search for terminology lookup
-// - All English comments
+
 
 import React, { useEffect, useMemo, useRef, useState } from "react"
-import { useLocation } from "react-router-dom"
+import { useLocation, useNavigate } from "react-router-dom"
 import { useSelector } from "react-redux"
 import type { RootState } from "../store"
 import { useAppDispatch } from "../store/hooks"
@@ -24,7 +23,7 @@ import TrainingAdviceList, { type TrainingAdvice } from "../components/profile/T
 import VetGlossarySearch from "../components/profile/VetGlossarySearch"
 import TutorialLauncher from "../components/tutorial/TutorialLauncher"
 import { useTrainingAdvice } from "../hooks/queries/useTrainingAdvice"
-
+import Button from "../components/ui/Button";
 // Redux actions + types
 import {
   setChosenRoles,
@@ -308,6 +307,7 @@ function SelectQuestion({
 export default function Profile(): React.ReactElement {
   const dispatch = useAppDispatch()
   const { state } = useLocation()
+  const navigate = useNavigate();
   const routeState = (state as (AnalyzerRouteState & { notice?: string }) | undefined) ?? undefined
 
   // Refs
@@ -445,6 +445,13 @@ export default function Profile(): React.ReactElement {
     const fileName = `Profile${code}.pdf`
     await exportElementToPdf(exportRef.current, fileName)
   }
+   const canGoInsight: boolean = Boolean(analyzer.selectedJob?.code);
+  const onGoToInsight = (): void => {
+    if (!canGoInsight) return;
+    navigate("/insight", {
+      state: { selectedJob: analyzer.selectedJob ?? null },
+    });
+  };
 
   return (
     <div id="profile-export-root" ref={exportRef}>
@@ -622,6 +629,26 @@ export default function Profile(): React.ReactElement {
 
           <VetGlossarySearch />
         </section>
+        <section id="insight-cta" className="mx-auto mt-10 max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
+  <div className="rounded-xl border border-border bg-white p-6 shadow-card">
+    <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
+      <p className="text-sm text-ink-soft">Want to see insights about your occupation?</p>
+
+      {/* English comments: disabled when no target job; show tooltip text in English */}
+      <Button
+        id="go-insight"
+        variant="primary"
+        size="md"
+        onClick={onGoToInsight}
+        disabled={!canGoInsight}
+        tooltipWhenDisabled="Please select a target job first"
+        aria-label="Go to Insight"
+      >
+        Go to Insight
+      </Button>
+    </div>
+  </div>
+</section>
       </div>
     </div>
   )
