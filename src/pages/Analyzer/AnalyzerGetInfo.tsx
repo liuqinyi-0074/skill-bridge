@@ -1,4 +1,3 @@
-// src/pages/Analyzer/AnalyzerGetInfo.tsx
 // Get Info step for the Analyzer wizard
 // - Uses AnalyzerLayout header (Title + HelpToggle) and ProgressBar + SummaryDock
 // - Search API requires the industry's FULL NAME; we map code/slug → name
