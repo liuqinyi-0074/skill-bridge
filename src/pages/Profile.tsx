@@ -309,6 +309,7 @@ export default function Profile(): React.ReactElement {
   const { state } = useLocation()
   const navigate = useNavigate();
   const routeState = (state as (AnalyzerRouteState & { notice?: string }) | undefined) ?? undefined
+  const [routeHydrated, setRouteHydrated] = useState(false)
 
   // Refs
   const exportRef = useRef<HTMLDivElement | null>(null)
@@ -320,29 +321,31 @@ export default function Profile(): React.ReactElement {
 
   // Hydrate from route state (one-time)
   useEffect(() => {
-    if (!routeState) return
-    if (!analyzer.chosenRoles?.length && routeState.roles?.length) {
-      dispatch(setChosenRoles(normalizeRoles(routeState.roles)))
+    if (routeState) {
+      if (!analyzer.chosenRoles?.length && routeState.roles?.length) {
+        dispatch(setChosenRoles(normalizeRoles(routeState.roles)))
+      }
+      if (!analyzer.chosenAbilities?.length && routeState.abilities?.length) {
+        dispatch(setChosenAbilities(routeState.abilities))
+      }
+      if (
+        (!analyzer.interestedIndustryCodes || analyzer.interestedIndustryCodes.length === 0) &&
+        routeState.industries?.length
+      ) {
+        dispatch(setInterestedIndustryCodes(routeState.industries))
+      }
+      if (!analyzer.preferredRegion && routeState.region) {
+        dispatch(setPreferredRegion(routeState.region))
+      }
+      if (!analyzer.selectedJob && routeState.selectedJob) {
+        const normalized = normalizeSelectedJob(routeState.selectedJob)
+        if (normalized) dispatch(setSelectedJob(normalized))
+      }
+      if (!analyzer.trainingAdvice && routeState.training) {
+        dispatch(setTrainingAdvice(routeState.training))
+      }
     }
-    if (!analyzer.chosenAbilities?.length && routeState.abilities?.length) {
-      dispatch(setChosenAbilities(routeState.abilities))
-    }
-    if (
-      (!analyzer.interestedIndustryCodes || analyzer.interestedIndustryCodes.length === 0) &&
-      routeState.industries?.length
-    ) {
-      dispatch(setInterestedIndustryCodes(routeState.industries))
-    }
-    if (!analyzer.preferredRegion && routeState.region) {
-      dispatch(setPreferredRegion(routeState.region))
-    }
-    if (!analyzer.selectedJob && routeState.selectedJob) {
-      const normalized = normalizeSelectedJob(routeState.selectedJob)
-      if (normalized) dispatch(setSelectedJob(normalized))
-    }
-    if (!analyzer.trainingAdvice && routeState.training) {
-      dispatch(setTrainingAdvice(routeState.training))
-    }
+    setRouteHydrated(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -356,12 +359,14 @@ export default function Profile(): React.ReactElement {
     const targetJobRoute = normalizeSelectedJob(routeState?.selectedJob)
     const regionRoute = routeState?.region || ""
 
-    const pastJobs = pastJobsRedux.length > 0 ? pastJobsRedux : pastJobsRoute
-    const targetJobSource = targetJobRedux ?? targetJobRoute
+    const pastJobs =
+      pastJobsRedux.length > 0 || routeHydrated ? pastJobsRedux : pastJobsRoute
+    const targetJobSource = targetJobRedux ?? (routeHydrated ? null : targetJobRoute)
     const targetJob = targetJobSource ? { id: targetJobSource.code, title: targetJobSource.title } : null
+    const region = routeHydrated ? regionRedux : regionRedux || regionRoute
 
-    return { pastJobs, targetJob, region: regionRedux || regionRoute }
-  }, [analyzer, routeState])
+    return { pastJobs, targetJob, region }
+  }, [analyzer, routeState, routeHydrated])
 
   // Handle career choice changes
   const onCareerChoiceChange = (next: CareerChoiceState): void => {
