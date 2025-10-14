@@ -281,7 +281,7 @@ function PageBody(): React.ReactElement {
       {/* Role search (Q1) */}
       <section className="mt-8" data-section="role-search">
         <h2 className="text-xl font-semibold text-ink mb-4">
-          1. Which occupation roles are you interested in?
+          1. What was your previous occupation??
         </h2>
 
         <SearchComboWithResults
