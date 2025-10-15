@@ -10,7 +10,53 @@ import bridgeUrl from "../assets/image/bridge.png"
 import analyzeSvg from "../assets/image/analyze.svg"
 import dataSvg from "../assets/image/data.svg"
 import profileSvg from "../assets/image/profie.svg"
+import HowItWorksGrid, { type HowItWorksStep } from "../components/analyzer/HowItWorksGrid";
+
+/** Tiny inline icons for demo purposes (parent controls the icon node) */
+const IconAnalyze: React.FC<{ className?: string }> = ({ className }) => (
+  // English: magnifier symbol for "Analyzer"
+  <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+    <circle cx="11" cy="11" r="6" fill="none" stroke="currentColor" strokeWidth="2" />
+    <path d="M20 20l-4.2-4.2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+  </svg>
+);
+
+const IconProfile: React.FC<{ className?: string }> = ({ className }) => (
+  // English: user avatar for "Profile"
+  <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+    <circle cx="12" cy="8" r="4" fill="currentColor" />
+    <path d="M4 20c0-4 4-6 8-6s8 2 8 6" fill="none" stroke="currentColor" strokeWidth="2" />
+  </svg>
+);
+
+const IconInsight: React.FC<{ className?: string }> = ({ className }) => (
+  // English: light bulb for "Insights"
+  <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+    <path d="M9 18h6v2H9z" fill="currentColor" />
+    <path d="M12 3a7 7 0 00-4 12c.6.5 1 1.2 1 2h6c0-.8.4-1.5 1-2A7 7 0 0012 3z" fill="none" stroke="currentColor" strokeWidth="2"/>
+  </svg>
+);
 export default function Home() {
+   const steps: HowItWorksStep[] = [
+    {
+      id: "step-analyzer",
+      title: "Run Analyzer",
+      desc: "Enter past occupation and target state to start the assessment.",
+      icon: <IconAnalyze className="w-full h-full" />,
+    },
+    {
+      id: "step-profile",
+      title: "See Profile",
+      desc: "Review abilities, gaps, and demand signals tailored to you.",
+      icon: <IconProfile className="w-full h-full" />,
+    },
+    {
+      id: "step-insight",
+      title: "Get Insights",
+      desc: "Match roles, compare regions, and plan your learning path.",
+      icon: <IconInsight className="w-full h-full" />,
+    },
+  ];
   // Shared sizes
   const HEADER_H = 64 // must match Hero.headerHeight
 
@@ -65,7 +111,7 @@ export default function Home() {
           headerHeight={HEADER_H}
           scrollTargetId="analyzer"
         />
-
+        <section className="px-4 sm:px-6 lg:px-8 py-16 text-center" aria-labelledby="how-it-works">
         {/* TOP SECTION: keep the extra 1/5 visible, then blend to white */}
         <section id="analyzer" className="relative bg-transparent">
           {/* Transparent → white cap over the extra 1/5 */}
@@ -78,8 +124,20 @@ export default function Home() {
                 "linear-gradient(to bottom, rgba(255,255,255,0) 0%, #ffffff 100%)",
             }}
           />
+      {/* English: the H2 lives in the parent; grid uses aria-labelledby for a11y structure */}
+      <h2 id="how-it-works" className="text-2xl sm:text-3xl font-bold text-ink">
+        Using SkillBridge
+      </h2>
+      <p className="mt-3 text-ink-soft">Analyzer → Profile → Insights</p>
+
+      <HowItWorksGrid
+        steps={steps}                 // English: pass 3-step model
+        labelledById="how-it-works"   // English: link region to the H2
+        className="mt-4"              // English: spacing above the grid
+      />
+    </section>
+
           {/* Content wrapper on white; small negative margin to pull content upward */}
-          <div className="bg-white -mt-30">
             <div className="mx-auto max-w-7xl px-4 pt-6 pb-12 lg:pt-8 lg:pb-16">
               <FeatureSection
                 visual="panel"
@@ -101,7 +159,6 @@ export default function Home() {
               
               />
             </div>
-          </div>
         </section>
 
         {/* CARDS: tighter section paddings and grid gaps */}
