@@ -1,8 +1,11 @@
 ﻿// Intro page for the Analyzer wizard.
 // - Uses a full-bleed hero and feature sections.
 // - CTA navigates to the first data-collection step via a static path.
+// - Floating CTA: fixed at bottom-right on large screens. It pushes up when near footer sentinel.
 
-import React from "react";
+import { useEffect, useRef, useState } from "react";
+import clsx from "clsx";
+import Button from "../../components/ui/Button";
 import HeroIntro from "../../components/HeroIntro";
 import FeatureCard from "../../components/FeatureCard";
 import DataAnalyzerIcon from "../../assets/image/dataAnalyzer.svg";
@@ -10,9 +13,7 @@ import MatchIcon from "../../assets/image/match.svg";
 import PlanIcon from "../../assets/image/plan.svg";
 import IntroImage from "../../assets/image/analyze.svg";
 import DataSource from "../../components/DataSource";
-import HowItWorksGrid, {
-  type HowItWorksStep,
-} from "../../components/analyzer/HowItWorksGrid";
+import HowItWorksGrid, { type HowItWorksStep } from "../../components/analyzer/HowItWorksGrid";
 
 /** Inline SVG icons for steps  */
 const IconUser: React.FC<{ className?: string }> = ({ className }) => (
@@ -27,6 +28,7 @@ const IconUser: React.FC<{ className?: string }> = ({ className }) => (
     />
   </svg>
 );
+
 const IconCheck: React.FC<{ className?: string }> = ({ className }) => (
   <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
     <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="2" />
@@ -40,6 +42,7 @@ const IconCheck: React.FC<{ className?: string }> = ({ className }) => (
     />
   </svg>
 );
+
 const IconTarget: React.FC<{ className?: string }> = ({ className }) => (
   <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
     <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="2" />
@@ -47,6 +50,7 @@ const IconTarget: React.FC<{ className?: string }> = ({ className }) => (
     <circle cx="12" cy="12" r="2" fill="currentColor" />
   </svg>
 );
+
 const IconBook: React.FC<{ className?: string }> = ({ className }) => (
   <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
     <path
@@ -61,6 +65,58 @@ const IconBook: React.FC<{ className?: string }> = ({ className }) => (
 );
 
 export default function AnalyzerIntro(): React.ReactElement {
+  // English: observe if the hero section is within the viewport
+  const heroRef = useRef<HTMLDivElement | null>(null);
+
+  // English: a tiny empty div placed above the footer to compute push-up distance
+  const footerSentinelRef = useRef<HTMLDivElement | null>(null);
+
+  // English: whether hero is visible; when false, show floating CTA on large screens
+  const [heroInView, setHeroInView] = useState<boolean>(true);
+
+  // English: how many pixels we need to lift the floating CTA to stay above footer
+  const [pushUpPx, setPushUpPx] = useState<number>(0);
+
+  // English: observe hero visibility to toggle floating CTA
+  useEffect(() => {
+    if (!heroRef.current) return;
+    const io = new IntersectionObserver(
+      (entries) => setHeroInView(entries[0].isIntersecting),
+      { threshold: 0.1 }
+    );
+    io.observe(heroRef.current);
+    return () => io.disconnect();
+  }, []);
+
+  // English: compute "push-up" amount for the floating CTA when footer sentinel overlaps viewport bottom
+  useEffect(() => {
+    let raf = 0;
+
+    const computePush = (): void => {
+      const el = footerSentinelRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const vh = window.innerHeight;
+      // overlap > 0 means sentinel's top has entered the viewport from the bottom side
+      const overlap = Math.max(0, vh - rect.top);
+      setPushUpPx(overlap);
+    };
+
+    const onScrollOrResize = (): void => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(computePush);
+    };
+
+    computePush();
+    window.addEventListener("scroll", onScrollOrResize, { passive: true });
+    window.addEventListener("resize", onScrollOrResize);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", onScrollOrResize);
+      window.removeEventListener("resize", onScrollOrResize);
+    };
+  }, []);
+
   // Data sources shown at the bottom
   const sources = [
     {
@@ -73,8 +129,7 @@ export default function AnalyzerIntro(): React.ReactElement {
       id: "2",
       name: "O*NET Online",
       url: "https://www.onetonline.org/",
-      description:
-        "Comprehensive occupational data and skill taxonomy from the U.S. Department of Labor.",
+      description: "Comprehensive occupational data and skill taxonomy from the U.S. Department of Labor.",
     },
   ] as const;
 
@@ -109,7 +164,7 @@ export default function AnalyzerIntro(): React.ReactElement {
   return (
     <>
       {/* Full-bleed hero: expands to screen width and touches header (no top gap) */}
-      <div className="w-screen mx-[calc(50%-50vw)]">
+      <div className="w-screen mx-[calc(50%-50vw)]" ref={heroRef}>
         <HeroIntro
           title="Career Analyzer"
           description="Understand your strengths, explore tailored job options, and plan your growth with evidence-based insights."
@@ -122,6 +177,14 @@ export default function AnalyzerIntro(): React.ReactElement {
 
       {/* Main content, centered and constrained */}
       <main className="px-4 sm:px-6 lg:px-8 py-16">
+        {/* Small screens (<lg): show a regular CTA at page bottom to avoid overlay */}
+        <div className="block lg:hidden mt-16">
+          <div className="max-w-7xl mx-auto text-center">
+            <p className="text-ink-soft mb-3">Want to find roles that fit you?</p>
+            <Button to="/analyzer/get-info">Take analyzer test now</Button>
+          </div>
+        </div>
+
         {/* Why choose us */}
         <section className="max-w-7xl mx-auto text-center">
           <h2 className="text-2xl sm:text-3xl font-bold text-ink">Why choose us</h2>
@@ -129,7 +192,7 @@ export default function AnalyzerIntro(): React.ReactElement {
             We combine market data, personalized recommendations, and clear action plans to support your career journey.
           </p>
 
-          {/* Features grid (centered) */}
+        {/* Features grid (centered) */}
           <div className="mt-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
             <FeatureCard
               title="Data-driven decisions"
@@ -175,10 +238,31 @@ export default function AnalyzerIntro(): React.ReactElement {
             Our insights are grounded in verified open data and official workforce statistics. These trusted sources ensure
             accuracy and transparency for every analysis.
           </p>
-
-            <DataSource sources={sources} title="" />
+          <DataSource sources={sources} title="" />
         </section>
+
+        {/* Footer sentinel to push the floating CTA up before the actual footer */}
+        <div ref={footerSentinelRef} aria-hidden className="h-1 w-full" />
       </main>
+
+      {/* Large screens (>=lg): fixed bottom-right CTA that pushes up when footer enters */}
+      {!heroInView && (
+        <div
+          className={clsx(
+            "hidden lg:block fixed right-6 z-40 transition-opacity duration-200",
+            heroInView ? "opacity-0 pointer-events-none" : "opacity-100"
+          )}
+          // Base gap 24px; add pushUpPx when the footer sentinel overlaps the viewport bottom
+          style={{ bottom: `${24 + Math.max(0, pushUpPx)}px` }}
+        >
+          <div className="backdrop-blur supports-[backdrop-filter]:bg-white/70 bg-white/95 border border-border rounded-2xl shadow-lg p-3 w-[18rem]">
+            <p className="text-sm text-ink-soft mb-2">Want to know which jobs fit you?</p>
+            <Button aria-label="Take the analyzer test now" to="/analyzer/get-info">
+              Take analyzer test now
+            </Button>
+          </div>
+        </div>
+      )}
     </>
   );
 }
