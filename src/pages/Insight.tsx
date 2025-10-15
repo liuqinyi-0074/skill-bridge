@@ -2,7 +2,7 @@
 // Career Insights page with fixed-launcher Tutorial integration. No layout impact.
 // First visit auto-opens tutorial via TutorialLauncher.autoOpenOnceKey.
 
-import { useMemo, useState } from "react";
+import { Suspense, lazy, useMemo, useState } from "react";
 import { useSelector } from "react-redux";
 import { Link } from "react-router-dom";
 import type { FeatureCollection, Geometry } from "geojson";
@@ -11,9 +11,7 @@ import rawGeo from "../assets/au-states.json";
 import { normalizeAuStates } from "../lib/utils/normalizeAuState";
 
 import HeroIntro from "../components/HeroIntro";
-import AuSvgMap from "../components/insight/AuMap";
 import OccupationGrowthStats from "../components/insight/OccupationGrowthCard";
-import GrowthComparisonChart from "../components/insight/GrowthComparisonChart";
 import HelpToggleSmall from "../components/ui/HelpToggleSmall";
 import ErrorBoundary from "../components/common/ErrorBoundary";
 import TutorialLauncher from "../components/tutorial/TutorialLauncher";
@@ -40,6 +38,11 @@ import { industryOptions, industryNameOf } from "../data/industries";
 import { useAnzscoSearch } from "../hooks/queries/userAnzscoSearch";
 import type { SearchParams } from "../hooks/queries/userAnzscoSearch";
 import type { AnzscoOccupation } from "../types/domain";
+
+const AuSvgMap = lazy(() => import("../components/insight/AuMap"));
+const GrowthComparisonChart = lazy(
+  () => import("../components/insight/GrowthComparisonChart")
+);
 
 const useReduxTarget = () => useSelector((s: RootState) => s.analyzer?.selectedJob ?? null);
 const getMajorGroupCode = (code: string) => code.trim().slice(0, 4);
@@ -201,18 +204,26 @@ function InsightInner(): React.ReactElement {
       setOpenPicker(false);
     }
   };
-
+   const description: React.ReactNode = currentCode ? (
+    <>
+      {/* Bold important nouns to improve scannability */}
+      Comprehensive insights for <strong>{title}</strong>. View{" "}
+      <strong>Growth Statistics</strong>, <strong>Growth Comparison</strong>, and{" "}
+      <strong>Geographic Distribution</strong> across Australia.
+    </>
+  ) : (
+    <>
+      <strong>No target job selected.</strong> Charts display placeholder data. Choose
+      an occupation or complete the analyzer test to load actual results.
+    </>
+  );
   return (
     <ErrorBoundary feedbackHref="/feedback">
       {/* Hero */}
       <div id="hero-section" className="relative">
         <HeroIntro
           title="Your Personalized Career Insights"
-          description={
-            currentCode
-              ? `Comprehensive data for ${title}. Explore employment trends and regional demand across Australia.`
-              : "Redux has no target job. Charts show zero by default. Select a job to load real data, or take the analyzer test."
-          }
+          description={description}
           image={InsightImage}
           tone="blue"
           imageDecorative
@@ -301,12 +312,22 @@ function InsightInner(): React.ReactElement {
                 helpContent="Compare this occupation's growth rate with related occupations and national average."
               />
               <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-md">
-                <GrowthComparisonChart
-                  selectedOccupationRate={safeCareer.selectedOccupationRate ?? 0}
-                  selectedOccupationLabel={safeCareer.majorGroupTitle || title}
-                  relatedOccupationsRate={safeCareer.relatedOccupationsRate ?? 0}
-                  nationalAverageRate={safeCareer.nationalAverageRate ?? 0}
-                />
+                <Suspense
+                  fallback={
+                    <div
+                      className="h-64 animate-pulse rounded-xl bg-slate-100"
+                      aria-busy="true"
+                      aria-label="Loading comparison chart"
+                    />
+                  }
+                >
+                  <GrowthComparisonChart
+                    selectedOccupationRate={safeCareer.selectedOccupationRate ?? 0}
+                    selectedOccupationLabel={safeCareer.majorGroupTitle || title}
+                    relatedOccupationsRate={safeCareer.relatedOccupationsRate ?? 0}
+                    nationalAverageRate={safeCareer.nationalAverageRate ?? 0}
+                  />
+                </Suspense>
               </div>
             </section>
 
@@ -320,15 +341,29 @@ function InsightInner(): React.ReactElement {
                 {(shortageLoading || shortageRefetching) && currentCode && (
                   <div className="flex flex-col items-center justify-center py-12" aria-live="polite">
                     <div className="mb-3 h-8 w-8 animate-spin rounded-full border-4 border-current border-t-transparent text-primary" />
-                    <p className="text-sm text-slate-600">Loading geographic data…</p>
+                    <p className="text-sm text-slate-600">Loading geographic data...</p>
                   </div>
                 )}
                 {(!currentCode || !(shortageLoading || shortageRefetching)) && (
-                  <AuSvgMap
-                    geo={geoData}
-                    values={employmentValues}
-                    onSelect={(code, value) => setSelectedState(`${code} — ${value.toLocaleString("en-AU")}`)}
-                  />
+                  <Suspense
+                    fallback={
+                      <div
+                        className="flex h-[320px] items-center justify-center"
+                        aria-busy="true"
+                        aria-label="Loading map"
+                      >
+                        <div className="h-8 w-8 animate-spin rounded-full border-4 border-current border-t-transparent text-primary" />
+                      </div>
+                    }
+                  >
+                    <AuSvgMap
+                      geo={geoData}
+                      values={employmentValues}
+                      onSelect={(code, value) =>
+                        setSelectedState(`${code} - ${value.toLocaleString("en-AU")}`)
+                      }
+                    />
+                  </Suspense>
                 )}
               </div>
 

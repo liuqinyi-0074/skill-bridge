@@ -61,7 +61,7 @@ export default function Home() {
         {/* HERO: smaller veil for a tighter joint */}
         <Hero
           title="Bridge your skills to the next role"
-          subtitle="Analyze strengths. Match roles. Build your roadmap."
+          subtitle="Run Analyzer. Build Profile. Surface Insights"
           headerHeight={HEADER_H}
           scrollTargetId="analyzer"
         />

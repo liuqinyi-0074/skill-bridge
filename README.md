@@ -17,9 +17,9 @@ The app is designed for modern UX: state persistence, skeleton loading, graceful
 | State Management | Redux Toolkit + React Redux                                   |
 | Data Fetching    | TanStack Query 5 (parallel queries, caching, retries)         |
 | Styling & UI     | Tailwind CSS 4, clsx, Lucide icons, custom Hero/Tutorial UI   |
-| Visualisation    | Recharts, D3-geo, TopoJSON                                    |
+| Visualisation    | Recharts, D3-geo                                   |
 | Misc Tools       | GSAP, html-to-image, jsPDF, redux-persist                     |
-| Quality & Tooling| ESLint + Prettier, TypeScript ESLint, Vitest & Playwright (preconfigured) |
+| Quality & Tooling| ESLint + Prettier, TypeScript ESLint, Vitest & Playwright  (preconfigured) |
 
 ## Installation & Run
 

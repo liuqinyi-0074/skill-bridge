@@ -1,43 +1,54 @@
-// Split layout: left industry list, right occupation groups.
-// Optional badges: shortageCount and avgMatch only render when provided.
-
 import { useMemo, useState } from "react";
 import clsx from "clsx";
 
-/** One detailed role item you will render inside a group (slot content) */
+/** Displayable child inside group body */
 export type GroupChild = React.ReactNode;
 
-/** Occupation group under an industry */
+/** Single role item with visible label */
+export type RoleItem = {
+  id: string;
+  label: string;
+};
+
+/** Occupation group data type */
 export type OccupationGroup = {
   id: string;
-  title: string;              // e.g. "Software Development"
-  jobsCount?: number;         // e.g. 4 → shown as "4 jobs" on the left of badges
-  shortageCount?: number;     // optional → red badge "4 shortages"
-  avgMatch?: number;          // optional → gray badge "89%"
-  children: GroupChild;       // grid/cards for roles
+  title: string;
+  jobsCount?: number;
+  shortageCount?: number;
+  avgMatch?: number;
+  children: GroupChild;
   collapsible?: boolean;
   defaultOpen?: boolean;
+  roleItems?: RoleItem[];
 };
 
-/** One industry in the left pane */
+/** Industry item containing multiple groups */
 export type IndustryItem = {
-  key: string;                // stable key
-  title: string;              // e.g. "Technology"
-  groupCount?: number;        // pill at right of the item
-  groups: OccupationGroup[];  // right pane data
+  key: string;
+  title: string;
+  groupCount?: number;
+  groups: OccupationGroup[];
 };
 
+/** Main props for JobSuggestion */
 export type JobSuggestionProps = {
-  industries: IndustryItem[];       // left list data
-  defaultSelectedKey?: string;       // initial selected industry
+  industries?: IndustryItem[];
+  defaultSelectedKey?: string;
   className?: string;
-  /** a11y text for expand/collapse */
   expandHint?: string;
   collapseHint?: string;
+  selectedRoleId?: string | null;
+  onSelectRole?: (id: string | null) => void;
 };
 
-/** Small rounded pill used for numbers */
-function Pill({ children, tone = "default" }: { children: React.ReactNode; tone?: "default" | "danger" }) {
+function Pill({
+  children,
+  tone = "default",
+}: {
+  children: React.ReactNode;
+  tone?: "default" | "danger";
+}) {
   return (
     <span
       className={clsx(
@@ -50,99 +61,140 @@ function Pill({ children, tone = "default" }: { children: React.ReactNode; tone?
   );
 }
 
-/** Chevron icon used on group header */
+/** Chevron icon for expand/collapse */
 function Chevron({ open }: { open: boolean }) {
   return (
     <svg
       className={clsx("h-4 w-4 transition-transform", open ? "rotate-180" : "rotate-0")}
       viewBox="0 0 20 20"
       fill="currentColor"
-      aria-hidden="true"
     >
       <path d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 10.06l3.71-2.83a.75.75 0 1 1 .92 1.18l-4.2 3.2a.75.75 0 0 1-.92 0l-4.2-3.2a.75.75 0 0 1-.02-1.06z" />
     </svg>
   );
 }
 
-/** One group card on the right */
+/**
+ * GroupCard:
+ * - Highlights when its role is selected
+ * - Clicking role toggles on/off
+ */
 function GroupCard({
   g,
   expandHint,
   collapseHint,
+  selectedRoleId,
+  onSelectRole,
 }: {
   g: OccupationGroup;
   expandHint: string;
   collapseHint: string;
+  selectedRoleId: string | null;
+  onSelectRole?: (id: string | null) => void;
 }) {
-  const [open, setOpen] = useState<boolean>(Boolean(g.defaultOpen));
-  const toggle = () => g.collapsible && setOpen((v) => !v);
+  const [open, setOpen] = useState<boolean>(!!g.defaultOpen);
+
+  const toggle = (): void => {
+    if (g.collapsible) setOpen((v) => !v);
+  };
+
+  /** Group is active if any of its role IDs match current selectedRoleId */
+  const isSelectedGroup = g.roleItems?.some((r) => r.id === selectedRoleId) ?? false;
 
   return (
     <article
       aria-labelledby={`group-${g.id}`}
       onClick={toggle}
       className={clsx(
-        "rounded-xl border bg-white p-4 cursor-pointer",
-        "border-accent hover:shadow-sm"
+        "cursor-pointer rounded-xl border p-4 transition-all",
+        isSelectedGroup
+          ? "border-primary bg-primary/10 shadow-md"
+          : "border-border bg-white hover:shadow-sm"
       )}
       title={open ? collapseHint : expandHint}
     >
       <div className="flex items-center justify-between">
-        <div className="min-w-0">
+        <div>
           <h3 id={`group-${g.id}`} className="text-lg font-semibold text-ink">
             {g.title}
           </h3>
-          {/* jobs count text on the left (optional) */}
           {typeof g.jobsCount === "number" && (
             <p className="mt-1 text-sm text-ink-soft">{g.jobsCount} jobs</p>
           )}
         </div>
 
-        {/* optional badges on the right */}
         <div className="flex items-center gap-2">
-          {typeof g.shortageCount === "number" && (
-            <Pill tone="danger">{g.shortageCount} shortages</Pill>
-          )}
+          {typeof g.shortageCount === "number" && <Pill tone="danger">{g.shortageCount} shortages</Pill>}
           {typeof g.avgMatch === "number" && <Pill>{g.avgMatch}%</Pill>}
-
           {g.collapsible && <Chevron open={open} />}
         </div>
       </div>
 
-      {/* body */}
-      <div className={clsx("mt-4", g.collapsible && !open && "hidden")}>{g.children}</div>
+      <div className={clsx("mt-4 space-y-2", g.collapsible && !open && "hidden")}>
+        {(g.roleItems ?? []).map((role) => {
+          const selected = role.id === selectedRoleId;
+          return (
+            <button
+              key={role.id}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelectRole?.(selected ? null : role.id);
+              }}
+              className={clsx(
+                "block w-full rounded-lg border px-3 py-2 text-left text-sm transition focus:outline-none focus:ring-2 focus:ring-primary",
+                selected
+                  ? "border-primary bg-primary text-white"
+                  : "border-border bg-white text-ink hover:bg-gray-50"
+              )}
+            >
+              {role.label}
+            </button>
+          );
+        })}
+
+        <div>{g.children}</div>
+      </div>
     </article>
   );
 }
 
-/** Main split component */
+/** Main JobSuggestion component */
 export default function JobSuggestion({
   industries,
   defaultSelectedKey,
   className,
   expandHint = "Expand to show jobs",
   collapseHint = "Collapse to hide jobs",
-}: JobSuggestionProps) {
-  const initialKey = useMemo(
-    () => defaultSelectedKey ?? industries[0]?.key ?? "",
-    [defaultSelectedKey, industries]
-  );
-  const [activeKey, setActiveKey] = useState<string>(initialKey);
+  selectedRoleId,
+  onSelectRole,
+}: JobSuggestionProps): React.ReactElement {
+  const list = useMemo(() => (Array.isArray(industries) ? industries : []), [industries]);
+  const initialKey = useMemo(() => defaultSelectedKey ?? list[0]?.key ?? "", [defaultSelectedKey, list]);
+  const [activeKey, setActiveKey] = useState(initialKey);
 
-  const active = industries.find((i) => i.key === activeKey);
+  const [localRole, setLocalRole] = useState<string | null>(null);
+  const effectiveSelectedRole = selectedRoleId ?? localRole;
+  const effectiveOnSelect = onSelectRole ?? setLocalRole;
+
+  const active = useMemo(() => list.find((i) => i.key === activeKey), [list, activeKey]);
+  const overlappingGroups = useMemo(() => {
+    if (!effectiveSelectedRole) return 0;
+    if (!active?.groups?.length) return 0;
+    return active.groups.reduce((count, group) => {
+      return count + (group.roleItems?.some((r) => r.id === effectiveSelectedRole) ? 1 : 0);
+    }, 0);
+  }, [active, effectiveSelectedRole]);
 
   return (
     <section className={clsx("rounded-2xl border border-border bg-white p-5 shadow-card", className)}>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-        {/* Left: Industries */}
+        {/* Left panel */}
         <aside className="lg:col-span-4">
           <h2 className="text-2xl font-bold text-ink">Industries</h2>
-          <p className="mt-1 text-ink-soft text-sm">
-            {industries.length} total
-          </p>
-
+          <p className="mt-1 text-sm text-ink-soft">{list.length} total</p>
           <ul className="mt-4 space-y-2">
-            {industries.map((it) => {
+            {list.map((it) => {
               const selected = it.key === activeKey;
               return (
                 <li key={it.key}>
@@ -150,17 +202,24 @@ export default function JobSuggestion({
                     type="button"
                     onClick={() => setActiveKey(it.key)}
                     className={clsx(
-                      "w-full rounded-2xl border px-4 py-4 text-left",
+                      "w-full rounded-2xl border px-4 py-4 text-left transition",
                       selected
-                        ? "bg-primary text-ink-invert border-transparent"
-                        : "bg-white text-ink border-border hover:bg-gray-50"
+                        ? "border-transparent bg-primary text-ink-invert"
+                        : "border-border bg-white text-ink hover:bg-gray-50"
                     )}
                   >
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="text-lg font-semibold">{it.title}</div>
-                        <div className={clsx("mt-1 text-sm", selected ? "text-ink-invert/80" : "text-ink-soft")}>
-                          {typeof it.groupCount === "number" ? `${it.groupCount} occupation groups` : ""}
+                        <div
+                          className={clsx(
+                            "mt-1 text-sm",
+                            selected ? "text-ink-invert/80" : "text-ink-soft"
+                          )}
+                        >
+                          {typeof it.groupCount === "number"
+                            ? `${it.groupCount} occupation groups`
+                            : ""}
                         </div>
                       </div>
                       {typeof it.groupCount === "number" && (
@@ -181,16 +240,28 @@ export default function JobSuggestion({
           </ul>
         </aside>
 
-        {/* Right: Groups of the selected industry */}
+        {/* Right panel */}
         <main className="lg:col-span-8">
           <h2 className="text-2xl font-bold text-ink">Occupation groups</h2>
-          <p className="mt-1 text-ink-soft text-sm">
+          <p className="mt-1 text-sm text-ink-soft">
             {typeof active?.groupCount === "number" ? `${active.groupCount} groups` : ""}
           </p>
+          {overlappingGroups > 1 && (
+            <div className="mt-3 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+              The selected role belongs to multiple groups, so they are highlighted together.
+            </div>
+          )}
 
           <div className="mt-4 space-y-4">
             {active?.groups.map((g) => (
-              <GroupCard key={g.id} g={g} expandHint={expandHint} collapseHint={collapseHint} />
+              <GroupCard
+                key={g.id}
+                g={g}
+                expandHint={expandHint}
+                collapseHint={collapseHint}
+                selectedRoleId={effectiveSelectedRole}
+                onSelectRole={effectiveOnSelect}
+              />
             ))}
 
             {!active?.groups?.length && (

@@ -11,6 +11,8 @@ import { store, persistor } from "./store";
 import { registerDefaultSummaryBuilders } from "./summary/defaultBuilders";
 import { registerAbilityCountsBuilder } from "./summary/abilityBuilder";
 import { registerJobSummaryBuilder } from "./summary/jobBuilder";
+import { initSentry } from "./sentry";
+initSentry(); 
 registerDefaultSummaryBuilders();
 registerAbilityCountsBuilder();
 registerJobSummaryBuilder();

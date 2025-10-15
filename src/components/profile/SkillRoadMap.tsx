@@ -2,7 +2,7 @@
 // - Uses shared <Button /> component for consistent style and disabled tooltips
 // - Dates are optional; status derives from presence and comparison with today
 
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   Plus,
   Edit2,
@@ -110,6 +110,24 @@ export default function SkillRoadMap({
     startDate: "",
     endDate: "",
   });
+  const todayIso = useMemo(() => {
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    return `${now.getFullYear()}-${month}-${day}`;
+  }, []);
+  const preventManualDateInput = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
+    event.preventDefault();
+  }, []);
+  const openDatePicker = useCallback(
+    (event: React.FocusEvent<HTMLInputElement> | React.MouseEvent<HTMLInputElement>) => {
+      const input = event.currentTarget as HTMLInputElement & { showPicker?: () => void };
+      if (typeof input.showPicker === "function") {
+        input.showPicker();
+      }
+    },
+    []
+  );
 
   /** Propagate to parent and local set */
   const syncSkills = (next: SkillRoadmapItem[]): void => {
@@ -531,6 +549,13 @@ export default function SkillRoadMap({
             <input
               type="date"
               value={formData.startDate}
+              min={todayIso}
+              inputMode="none"
+              onKeyDown={preventManualDateInput}
+              onFocus={openDatePicker}
+              onClick={openDatePicker}
+              onPaste={(e) => e.preventDefault()}
+              onDrop={(e) => e.preventDefault()}
               onChange={(e) =>
                 setFormData({ ...formData, startDate: e.target.value })
               }
@@ -545,6 +570,13 @@ export default function SkillRoadMap({
             <input
               type="date"
               value={formData.endDate}
+              min={formData.startDate || todayIso}
+              inputMode="none"
+              onKeyDown={preventManualDateInput}
+              onFocus={openDatePicker}
+              onClick={openDatePicker}
+              onPaste={(e) => e.preventDefault()}
+              onDrop={(e) => e.preventDefault()}
               onChange={(e) =>
                 setFormData({ ...formData, endDate: e.target.value })
               }

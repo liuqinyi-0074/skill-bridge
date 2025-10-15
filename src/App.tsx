@@ -4,14 +4,14 @@
 // - Password gate persists "unlocked" to localStorage so reloads do not ask again.
 // - This is a UX gate only. Do not treat it as real security.
 // - Scroll-to-top on route changes (except hash navigation).
-// - Analyzer state resets on browser unload to avoid stale flows.
+// - Analyzer state auto-cleans when idle for too long to avoid stale flows.
 
 import { Suspense, lazy, useEffect, useMemo, useState } from "react"
 import { useNavigate, Routes, Route, Navigate, useLocation } from "react-router-dom"
 import MainLayout from "./layouts/MainLayout"
 import ErrorBoundary from "./components/common/ErrorBoundary"
 import AnalyzerEntry from "./pages/Analyzer/AnalyzerEntry"
-import { useAppDispatch } from "./store/hooks"
+import { useAppDispatch, useAppSelector } from "./store/hooks"
 import { resetAnalyzer } from "./store/analyzerSlice"
 
 const PASSWORD: string | undefined = import.meta.env.VITE_SITE_PASSWORD
@@ -129,6 +129,7 @@ function PasswordGate(props: { children: React.ReactElement }): React.ReactEleme
 export default function App(): React.ReactElement {
   const { pathname, hash } = useLocation()
   const dispatch = useAppDispatch()
+  const lastActivity = useAppSelector((s) => s.analyzer.lastActivity)
 
   // Scroll to top on route change unless navigating to an anchor.
   useEffect(() => {
@@ -136,16 +137,15 @@ export default function App(): React.ReactElement {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" })
   }, [pathname, hash])
 
-  // Reset analyzer on unload to avoid stale state when reopening the app.
+  // Auto-clear analyzer state if it has been idle for too long (avoid stale flows on revisits).
   useEffect(() => {
-    const handleBeforeUnload = (): void => {
+    if (!lastActivity) return
+    const STALE_THRESHOLD_MS = 12 * 60 * 60 * 1000 // 12 hours
+    const stale = Date.now() - lastActivity > STALE_THRESHOLD_MS
+    if (stale) {
       dispatch(resetAnalyzer())
     }
-    window.addEventListener("beforeunload", handleBeforeUnload)
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload)
-    }
-  }, [dispatch])
+  }, [lastActivity, dispatch])
 
   return (
     <PasswordGate>

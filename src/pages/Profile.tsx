@@ -502,7 +502,7 @@ export default function Profile(): React.ReactElement {
             />
           </div>
           <p className="mx-auto max-w-3xl text-base text-slate-700 sm:text-lg">
-            Organize your career intent, track your skill development roadmap, and discover relevant training opportunities.
+            User Profile · Career Roadmap · Skill Development · Glossary Search
           </p>
           {notice && (
             <div className="mt-4 inline-block rounded-lg border border-green-300 bg-green-50 p-4 text-sm text-green-800">

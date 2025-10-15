@@ -144,6 +144,11 @@ export default function AnalyzerJobSuggestion(): React.ReactElement {
   // Local selection mirrors Redux to support toggle UX; hydrate from store
   const [selected, setSelected] = useState<SelectedJob>(storedTarget ?? null);
 
+  // Keep local selection aligned when Redux rehydrates or updates externally
+  useEffect(() => {
+    setSelected(storedTarget ?? null);
+  }, [storedTarget]);
+
   // Build selection payload for backend
   const selections: SelectionItem[] = useMemo(() => {
     const src = abilities ?? [];
@@ -207,12 +212,13 @@ export default function AnalyzerJobSuggestion(): React.ReactElement {
   }, [many.list]);
 
   useEffect(() => {
+    if (many.anyFetching) return;
     if (selected && !allCodes.has(selected.code)) {
       setSelected(null);
       dispatch(setSelectedJob(null));
       dispatch(setSelectedJobUnmatched(null));
     }
-  }, [allCodes, selected, dispatch]);
+  }, [many.anyFetching, allCodes, selected, dispatch]);
 
   // Toggle pick and write-through to Redux so other steps see it
   const handlePick = useCallback(
@@ -251,6 +257,7 @@ export default function AnalyzerJobSuggestion(): React.ReactElement {
               avgMatch: typeof g.matchPct === "number" ? g.matchPct : undefined,
               collapsible: true,
               defaultOpen: false,
+              roleItems: visibleJobs.map((j) => ({ id: j.code, label: j.title })),
               children: (
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                   {visibleJobs.map((job) => {
@@ -351,7 +358,7 @@ export default function AnalyzerJobSuggestion(): React.ReactElement {
       {/* Split layout: left industries, right groups */}
       {canQuery && !many.anyFetching && (
         <div className="mt-6">
-          <JobSuggestion industries={splitData} defaultSelectedKey={splitData[0]?.key} />
+          <JobSuggestion industries={splitData} defaultSelectedKey={splitData[0]?.key} selectedRoleId={selected?.code ?? null}/>
         </div>
       )}
 

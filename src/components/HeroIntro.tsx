@@ -7,7 +7,7 @@ type Tone = "blue" | "yellow" | "white";
 
 type HeroIntroProps = {
   title: string;
-  description: string;
+  description: React.ReactNode;
   image: string;
   tone?: Tone;
   className?: string;
@@ -94,6 +94,7 @@ export default function HeroIntro({
               "mt-3 sm:mt-5 text-ink-soft leading-relaxed",
               "[font-size:clamp(0.95rem,2.2vw,1.125rem)]",
               " [overflow-wrap:anywhere] hyphens-auto",
+              "[&_strong]:font-semibold",
               "max-w-[65ch]"
             )}
           >
