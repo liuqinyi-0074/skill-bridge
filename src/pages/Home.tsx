@@ -134,6 +134,7 @@ export default function Home() {
         steps={steps}                 // English: pass 3-step model
         labelledById="how-it-works"   // English: link region to the H2
         className="mt-4"              // English: spacing above the grid
+        columns={steps.length}        // English: keep cards on one line when width allows
       />
     </section>
 

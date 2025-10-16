@@ -1,13 +1,14 @@
 // Skill roadmap editor with filtering, batch selection, and accessible actions
 // - Uses shared <Button /> component for consistent style and disabled tooltips
 // - Dates are optional; status derives from presence and comparison with today
+// - Date pickers: open from input's own click/keydown in the same user gesture
 
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import {
   Plus,
   Edit2,
   Trash2,
-  Calendar,
+  Calendar as CalendarIcon,
   TrendingUp,
   Clock,
   AlertCircle,
@@ -74,6 +75,42 @@ const normalizeInitial = (items?: SkillRoadmapItem[]): SkillRoadmapItem[] =>
     id: item.id ?? createId(),
   }));
 
+// ---------- Date helpers (English-only comments as requested) ----------
+function tryOpenPicker(el: HTMLInputElement): void {
+  const has =
+    "showPicker" in el &&
+    typeof (el as HTMLInputElement & { showPicker: () => void }).showPicker === "function";
+  if (!has) return; // fallback: let the default click behavior open the native UI
+  if (document.activeElement !== el) el.focus(); // some engines require focus
+  try {
+    (el as HTMLInputElement & { showPicker: () => void }).showPicker();
+  } catch {
+    // ignore; default click already happened or engine rejected
+  }
+}
+
+// Block manual typing but keep navigation keys
+function blockTyping(e: React.KeyboardEvent<HTMLInputElement>): void {
+  const allow = [
+    "Tab",
+    "Shift",
+    "Control",
+    "Alt",
+    "Escape",
+    "Enter",
+    " ",
+    "ArrowLeft",
+    "ArrowRight",
+    "ArrowUp",
+    "ArrowDown",
+    "Home",
+    "End",
+  ];
+  if (allow.includes(e.key)) return;
+  e.preventDefault();
+}
+// ----------------------------------------------------------------------
+
 export default function SkillRoadMap({
   initialSkills,
   onChange,
@@ -83,9 +120,7 @@ export default function SkillRoadMap({
   );
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
   const [showEditModal, setShowEditModal] = useState<boolean>(false);
-  const [editingSkill, setEditingSkill] = useState<SkillRoadmapItem | null>(
-    null
-  );
+  const [editingSkill, setEditingSkill] = useState<SkillRoadmapItem | null>(null);
   const [collapsed, setCollapsed] = useState<boolean>(false);
 
   // Filters and batch selection state
@@ -110,24 +145,17 @@ export default function SkillRoadMap({
     startDate: "",
     endDate: "",
   });
-  const todayIso = useMemo(() => {
+
+  // Native refs (optional, but handy if you need direct element access)
+  const startRef = useRef<HTMLInputElement | null>(null);
+  const endRef = useRef<HTMLInputElement | null>(null);
+
+  const todayIso = useMemo((): string => {
     const now = new Date();
     const month = String(now.getMonth() + 1).padStart(2, "0");
     const day = String(now.getDate()).padStart(2, "0");
     return `${now.getFullYear()}-${month}-${day}`;
   }, []);
-  const preventManualDateInput = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
-    event.preventDefault();
-  }, []);
-  const openDatePicker = useCallback(
-    (event: React.FocusEvent<HTMLInputElement> | React.MouseEvent<HTMLInputElement>) => {
-      const input = event.currentTarget as HTMLInputElement & { showPicker?: () => void };
-      if (typeof input.showPicker === "function") {
-        input.showPicker();
-      }
-    },
-    []
-  );
 
   /** Propagate to parent and local set */
   const syncSkills = (next: SkillRoadmapItem[]): void => {
@@ -186,9 +214,7 @@ export default function SkillRoadMap({
         ];
       }
     } else if (type === "knowledge") {
-      return (
-        knowledgeCategories[category as keyof typeof knowledgeCategories] || []
-      );
+      return knowledgeCategories[category as keyof typeof knowledgeCategories] || [];
     } else if (type === "tech") {
       return techSkillCategories[category as keyof typeof techSkillCategories] || [];
     }
@@ -196,10 +222,7 @@ export default function SkillRoadMap({
   };
 
   /** Compute status from dates with sort priority */
-  const getSkillStatus = (
-    startDate?: string,
-    endDate?: string
-  ): StatusInfo => {
+  const getSkillStatus = (startDate?: string, endDate?: string): StatusInfo => {
     const start = parseDateStrict(startDate);
     const end = parseDateStrict(endDate);
 
@@ -209,7 +232,7 @@ export default function SkillRoadMap({
         label: "Not scheduled",
         color: "bg-gray-100 text-ink-soft border-border",
         icon: Clock,
-        sortOrder: 4, // Last priority
+        sortOrder: 4,
       };
     }
 
@@ -238,12 +261,12 @@ export default function SkillRoadMap({
       label: "Date Passed",
       color: "bg-accent/20 text-black border-accent",
       icon: AlertCircle,
-      sortOrder: 1, // First priority
+      sortOrder: 1,
     };
   };
 
   /** Filter + sort list deterministically */
-  const filteredAndSortedSkills = useMemo(() => {
+  const filteredAndSortedSkills = useMemo((): SkillRoadmapItem[] => {
     let result = [...skills];
 
     if (filterType !== "all") {
@@ -266,41 +289,42 @@ export default function SkillRoadMap({
   }, [skills, filterType, filterStatus]);
 
   /** Summary counts for collapsed view */
-  const summary = useMemo(() => {
-    const total = skills.length;
+  const summary = useMemo(
+    (): { total: number; notScheduled: number; inProgress: number; datePassed: number } => {
+      const total = skills.length;
 
-    const notScheduled = skills.reduce((acc, s) => {
-      const start = parseDateStrict(s.startDate);
-      const end = parseDateStrict(s.endDate);
-      return acc + (!start || !end ? 1 : 0);
-    }, 0);
+      const notScheduled = skills.reduce((acc, s) => {
+        const start = parseDateStrict(s.startDate);
+        const end = parseDateStrict(s.endDate);
+        return acc + (!start || !end ? 1 : 0);
+      }, 0);
 
-    let inProgress = 0;
-    let datePassed = 0;
-    for (const s of skills) {
-      const st = getSkillStatus(s.startDate, s.endDate).status;
-      if (st === "in-progress") inProgress += 1;
-      if (st === "completed") datePassed += 1;
-    }
+      let inProgress = 0;
+      let datePassed = 0;
+      for (const s of skills) {
+        const st = getSkillStatus(s.startDate, s.endDate).status;
+        if (st === "in-progress") inProgress += 1;
+        if (st === "completed") datePassed += 1;
+      }
 
-    return { total, notScheduled, inProgress, datePassed };
-  }, [skills]);
+      return { total, notScheduled, inProgress, datePassed };
+    },
+    [skills]
+  );
 
   // -----------------------
   // CRUD handlers
   // -----------------------
-  const canSubmitBase = Boolean(
-    formData.abilityType && formData.category && formData.skill
-  );
+  const canSubmitBase = Boolean(formData.abilityType && formData.category && formData.skill);
 
   const canSubmitAdd = canSubmitBase;
   const addDisabledReason = !formData.abilityType
     ? "Please select ability type."
     : !formData.category
-      ? "Please select category."
-      : !formData.skill
-        ? "Please select skill."
-        : undefined;
+    ? "Please select category."
+    : !formData.skill
+    ? "Please select skill."
+    : undefined;
 
   const canSubmitEdit = canSubmitBase;
   const editDisabledReason = addDisabledReason;
@@ -313,7 +337,6 @@ export default function SkillRoadMap({
       category: formData.category,
       skill: formData.skill,
       code: formData.code?.trim() ? formData.code.trim() : undefined,
-      // Dates optional
       startDate: formData.startDate || undefined,
       endDate: formData.endDate || undefined,
     };
@@ -426,7 +449,8 @@ export default function SkillRoadMap({
       <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-3 sm:p-4">
         <div
           className="bg-white rounded-xl shadow-modal w-full max-h-[98vh] overflow-y-auto
-             max-w-sm sm:max-w-md md:max-w-lg lg:max-w-2xl xl:max-w-3xl">
+             max-w-sm sm:max-w-md md:max-w-lg lg:max-w-2xl xl:max-w-3xl"
+        >
           <div className="p-4 sm:p-6">
             <h2 className="text-xl sm:text-2xl font-heading font-bold text-ink mb-3 sm:mb-4">
               {title}
@@ -456,9 +480,7 @@ export default function SkillRoadMap({
       <div className="space-y-4">
         {/* Ability type */}
         <div>
-          <label className="block text-sm font-medium text-ink mb-2">
-            Ability Type
-          </label>
+          <label className="block text-sm font-medium text-ink mb-2">Ability Type</label>
           <select
             value={formData.abilityType}
             onChange={(e) =>
@@ -482,9 +504,7 @@ export default function SkillRoadMap({
         {/* Category */}
         {formData.abilityType && (
           <div>
-            <label className="block text-sm font-medium text-ink mb-2">
-              Category
-            </label>
+            <label className="block text-sm font-medium text-ink mb-2">Category</label>
             <select
               value={formData.category}
               onChange={(e) =>
@@ -510,9 +530,7 @@ export default function SkillRoadMap({
         {/* Skill */}
         {formData.category && (
           <div>
-            <label className="block text-sm font-medium text-ink mb-2">
-              Skill
-            </label>
+            <label className="block text-sm font-medium text-ink mb-2">Skill</label>
             <select
               value={formData.skill}
               onChange={(e) => {
@@ -529,57 +547,58 @@ export default function SkillRoadMap({
               className="w-full p-2.5 sm:p-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40 text-ink"
             >
               <option value="">Select Skill</option>
-              {getSkillOptions(formData.abilityType, formData.category).map(
-                (opt) => (
-                  <option key={opt.code || opt.name} value={opt.name}>
-                    {opt.name}
-                  </option>
-                )
-              )}
+              {getSkillOptions(formData.abilityType, formData.category).map((opt) => (
+                <option key={opt.code || opt.name} value={opt.name}>
+                  {opt.name}
+                </option>
+              ))}
             </select>
           </div>
         )}
 
         {/* Dates are optional */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Start Date */}
           <div>
-            <label className="block text-sm font-medium text-ink mb-2">
-              Start Date
-            </label>
+            <label className="block text-sm font-medium text-ink mb-2">Start Date</label>
             <input
+              ref={startRef}
               type="date"
               value={formData.startDate}
               min={todayIso}
-              inputMode="none"
-              onKeyDown={preventManualDateInput}
-              onFocus={openDatePicker}
-              onClick={openDatePicker}
-              onPaste={(e) => e.preventDefault()}
-              onDrop={(e) => e.preventDefault()}
-              onChange={(e) =>
-                setFormData({ ...formData, startDate: e.target.value })
-              }
+              // English: open picker on real click; if unsupported, browser default opens
+              onClick={(e) => tryOpenPicker(e.currentTarget)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  tryOpenPicker(e.currentTarget);
+                  e.preventDefault();
+                } else {
+                  blockTyping(e);
+                }
+              }}
+              onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
               className="w-full p-2.5 sm:p-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40 text-ink"
             />
           </div>
 
+          {/* End Date */}
           <div>
-            <label className="block text-sm font-medium text-ink mb-2">
-              End Date
-            </label>
+            <label className="block text-sm font-medium text-ink mb-2">End Date</label>
             <input
+              ref={endRef}
               type="date"
               value={formData.endDate}
               min={formData.startDate || todayIso}
-              inputMode="none"
-              onKeyDown={preventManualDateInput}
-              onFocus={openDatePicker}
-              onClick={openDatePicker}
-              onPaste={(e) => e.preventDefault()}
-              onDrop={(e) => e.preventDefault()}
-              onChange={(e) =>
-                setFormData({ ...formData, endDate: e.target.value })
-              }
+              onClick={(e) => tryOpenPicker(e.currentTarget)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  tryOpenPicker(e.currentTarget);
+                  e.preventDefault();
+                } else {
+                  blockTyping(e);
+                }
+              }}
+              onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
               className="w-full p-2.5 sm:p-3 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40 text-ink"
             />
           </div>
@@ -624,7 +643,7 @@ export default function SkillRoadMap({
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between gap-3 sm:gap-4 items-start sm:items-center mb-6 sm:mb-8">
           <h3 className="text-xl sm:text-xl lg:text-xl font-heading font-bold text-ink">
-            {/* Intentionally empty or you can put a small title */}
+            {/* Intentionally empty or add a small title */}
           </h3>
 
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
@@ -635,11 +654,7 @@ export default function SkillRoadMap({
                   size="sm"
                   onClick={() => setShowBatchActions(!showBatchActions)}
                   aria-label={showBatchActions ? "Exit batch mode" : "Enter batch mode"}
-                  className={
-                    showBatchActions
-                      ? "border-primary text-primary bg-primary/10"
-                      : undefined
-                  }
+                  className={showBatchActions ? "border-primary text-primary bg-primary/10" : undefined}
                 >
                   <CheckSquare size={18} className="mr-1.5" />
                   Batch
@@ -651,7 +666,11 @@ export default function SkillRoadMap({
                   onClick={() => setCollapsed((v) => !v)}
                   aria-label={collapsed ? "Show all" : "Show less"}
                 >
-                  {collapsed ? <ChevronDown size={18} className="mr-1.5" /> : <ChevronUp size={18} className="mr-1.5" />}
+                  {collapsed ? (
+                    <ChevronDown size={18} className="mr-1.5" />
+                  ) : (
+                    <ChevronUp size={18} className="mr-1.5" />
+                  )}
                   {collapsed ? "Show all" : "Show less"}
                 </Button>
               </>
@@ -680,14 +699,10 @@ export default function SkillRoadMap({
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="block text-xs font-medium text-ink-soft mb-1">
-                  Type
-                </label>
+                <label className="block text-xs font-medium text-ink-soft mb-1">Type</label>
                 <select
                   value={filterType}
-                  onChange={(e) =>
-                    setFilterType(e.target.value as AbilityType | "all")
-                  }
+                  onChange={(e) => setFilterType(e.target.value as AbilityType | "all")}
                   className="w-full p-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
                 >
                   <option value="all">All Types</option>
@@ -698,9 +713,7 @@ export default function SkillRoadMap({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-ink-soft mb-1">
-                  Status
-                </label>
+                <label className="block text-xs font-medium text-ink-soft mb-1">Status</label>
                 <select
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value)}
@@ -768,36 +781,28 @@ export default function SkillRoadMap({
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
               <div className="rounded-lg border border-border p-3 sm:p-4">
                 <div className="text-xs sm:text-sm text-ink-soft mb-1">Total</div>
-                <div className="text-xl sm:text-2xl font-bold text-ink">
-                  {summary.total}
-                </div>
+                <div className="text-xl sm:text-2xl font-bold text-ink">{summary.total}</div>
               </div>
               <div className="rounded-lg border border-border p-3 sm:p-4">
                 <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-ink-soft mb-1">
                   <AlertCircle size={14} />
                   <span>Date Passed</span>
                 </div>
-                <div className="text-xl sm:text-2xl font-bold text-ink">
-                  {summary.datePassed}
-                </div>
+                <div className="text-xl sm:text-2xl font-bold text-ink">{summary.datePassed}</div>
               </div>
               <div className="rounded-lg border border-border p-3 sm:p-4">
                 <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-ink-soft mb-1">
                   <Clock size={14} />
                   <span>Not Scheduled</span>
                 </div>
-                <div className="text-xl sm:text-2xl font-bold text-ink">
-                  {summary.notScheduled}
-                </div>
+                <div className="text-xl sm:text-2xl font-bold text-ink">{summary.notScheduled}</div>
               </div>
               <div className="rounded-lg border border-border p-3 sm:p-4">
                 <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-ink-soft mb-1">
                   <TrendingUp size={14} />
                   <span>In Progress</span>
                 </div>
-                <div className="text-xl sm:text-2xl font-bold text-ink">
-                  {summary.inProgress}
-                </div>
+                <div className="text-xl sm:text-2xl font-bold text-ink">{summary.inProgress}</div>
               </div>
             </div>
           </div>
@@ -805,14 +810,8 @@ export default function SkillRoadMap({
           <>
             {skills.length === 0 ? (
               <div className="bg-white rounded-xl shadow-card border border-border p-8 sm:p-12 text-center">
-                <Calendar
-                  size={56}
-                  className="mx-auto mb-3 text-ink-soft/40 sm:hidden"
-                />
-                <Calendar
-                  size={64}
-                  className="mx-auto mb-4 text-ink-soft/40 hidden sm:block"
-                />
+                <CalendarIcon size={56} className="mx-auto mb-3 text-ink-soft/40 sm:hidden" />
+                <CalendarIcon size={64} className="mx-auto mb-4 text-ink-soft/40 hidden sm:block" />
                 <h2 className="text-lg sm:text-2xl font-heading font-semibold text-ink mb-2">
                   Not selected yet
                 </h2>
@@ -834,9 +833,7 @@ export default function SkillRoadMap({
                 <div className="px-4 py-3 border-b border-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 bg-gray-50/50">
                   <div className="flex items-center gap-2 text-sm text-ink-soft">
                     <ArrowUpDown size={16} />
-                    <span>
-                      Sorted: Date Passed → In Progress → Not Started → Not Scheduled
-                    </span>
+                    <span>Sorted: Date Passed → In Progress → Not Started → Not Scheduled</span>
                   </div>
                   {showBatchActions && (
                     <Button
@@ -844,9 +841,7 @@ export default function SkillRoadMap({
                       size="sm"
                       onClick={toggleSelectAll}
                       aria-label={
-                        selectedIds.size === filteredAndSortedSkills.length
-                          ? "Deselect all"
-                          : "Select all"
+                        selectedIds.size === filteredAndSortedSkills.length ? "Deselect all" : "Select all"
                       }
                       className="text-primary hover:underline"
                     >
@@ -869,10 +864,7 @@ export default function SkillRoadMap({
                 <div className="max-h-[600px] overflow-y-auto">
                   <div className="p-3 sm:p-4 space-y-3">
                     {filteredAndSortedSkills.map((skill) => {
-                      const statusInfo = getSkillStatus(
-                        skill.startDate,
-                        skill.endDate
-                      );
+                      const statusInfo = getSkillStatus(skill.startDate, skill.endDate);
                       const StatusIcon = statusInfo.icon;
                       const isSelected = selectedIds.has(skill.id);
 
@@ -907,9 +899,7 @@ export default function SkillRoadMap({
 
                               {/* Meta */}
                               <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs sm:text-sm text-ink-soft">
-                                <span className="capitalize font-medium">
-                                  {skill.abilityType}
-                                </span>
+                                <span className="capitalize font-medium">{skill.abilityType}</span>
                                 <span>→</span>
                                 <span className="capitalize">{skill.category}</span>
 
@@ -921,11 +911,11 @@ export default function SkillRoadMap({
                                 </span>
 
                                 <span className="flex items-center gap-1">
-                                  <Calendar size={14} className="opacity-70" />
+                                  <CalendarIcon size={14} className="opacity-70" />
                                   <span>Start: {formatDateLabel(skill.startDate)}</span>
                                 </span>
                                 <span className="flex items-center gap-1">
-                                  <Calendar size={14} className="opacity-70" />
+                                  <CalendarIcon size={14} className="opacity-70" />
                                   <span>End: {formatDateLabel(skill.endDate)}</span>
                                 </span>
                               </div>
@@ -976,9 +966,7 @@ export default function SkillRoadMap({
                 {filteredAndSortedSkills.length === 0 && skills.length > 0 && (
                   <div className="p-8 text-center">
                     <Filter size={48} className="mx-auto mb-3 text-ink-soft/40" />
-                    <h3 className="text-lg font-semibold text-ink mb-2">
-                      No skills match your filters
-                    </h3>
+                    <h3 className="text-lg font-semibold text-ink mb-2">No skills match your filters</h3>
                     <p className="text-ink-soft mb-4">Try adjusting your filter criteria</p>
                     <Button
                       variant="ghost"

@@ -20,6 +20,11 @@ export type HowItWorksGridProps = {
   /** Optional className for outer section */
   className?: string;
   /**
+   * Desired number of cards per row on desktop breakpoints.
+   * Defaults to total steps so every card can sit on one line when there is space.
+   */
+  columns?: number;
+  /**
    * Optional accessible label id for the region, e.g. the id of an H2 outside.
    * When provided, we expose aria-labelledby for better a11y structure.
    */
@@ -29,7 +34,10 @@ export type HowItWorksGridProps = {
 /** Single step card without animation */
 const StepCard: React.FC<HowItWorksStep> = ({ title, desc, icon }) => {
   return (
-    <div className="flex flex-col items-center text-center gap-3 px-2 py-4" role="listitem">
+    <div
+      className="flex w-full flex-col items-center gap-3 px-2 py-4 text-center"
+      role="listitem"
+    >
       <div
         className="w-20 h-20 rounded-2xl bg-primary text-white flex items-center justify-center"
         aria-hidden="true"
@@ -44,24 +52,44 @@ const StepCard: React.FC<HowItWorksStep> = ({ title, desc, icon }) => {
 };
 
 /**
- * HowItWorksGrid (no animation)
- * - Headerless, centered grid.
- * - Parent supplies icons, ids, titles, descriptions.
+ * HowItWorksGrid
+ * Layout rules:
+ * - Mobile: one column grid for readability.
+ * - Desktop and up: adopt the requested column count and wrap naturally if the viewport is narrow.
+ * - Use CSS variable to pass template columns so we can keep Tailwind classes static.
+ * - Cards stretch to column width but keep internal content centered for symmetry.
  */
-const HowItWorksGrid: React.FC<HowItWorksGridProps> = ({ steps, className, labelledById }) => {
+const HowItWorksGrid: React.FC<HowItWorksGridProps> = ({
+  steps,
+  className,
+  columns,
+  labelledById,
+}) => {
+  const totalSteps = steps.length;
+  const desiredColumns = Math.max(1, columns ?? (totalSteps || 1));
+  const safeColumns = Math.min(desiredColumns, Math.max(totalSteps, 1));
+
+  type GridStyle = React.CSSProperties & { "--hiw-cols"?: string };
+  const gridStyle: GridStyle = {
+    "--hiw-cols": `repeat(${safeColumns}, minmax(0, 1fr))`,
+  };
+
   return (
     <section
       className={clsx("py-6 sm:py-8", className)} // English comment: tighter vertical rhythm
       aria-labelledby={labelledById}
     >
-      {/* Steps grid only; header is owned by the parent page */}
+      {/* Headerless grid; parent owns heading */}
       <div
         role="list"
         className={clsx(
-          "mx-auto max-w-5xl",
-          "grid grid-cols-1 sm:grid-cols-3 gap-6 md:gap-8",
-          "place-items-center justify-items-center"
+          "mx-auto w-full max-w-6xl",
+          // Mobile: single column, centered items
+          "grid grid-cols-1 gap-6 place-items-center justify-items-center",
+          // Desktop+: expand to requested column count; allow wrap when space is constrained
+          "md:gap-8 md:place-items-stretch md:justify-items-stretch md:[grid-template-columns:var(--hiw-cols)]"
         )}
+        style={gridStyle}
       >
         {steps.map((s) => (
           <StepCard key={s.id} id={s.id} title={s.title} desc={s.desc} icon={s.icon} />

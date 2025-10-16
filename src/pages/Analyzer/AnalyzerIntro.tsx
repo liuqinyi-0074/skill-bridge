@@ -131,6 +131,12 @@ export default function AnalyzerIntro(): React.ReactElement {
       url: "https://www.onetonline.org/",
       description: "Comprehensive occupational data and skill taxonomy from the U.S. Department of Labor.",
     },
+    {
+      id: "3",
+      name: "Victorian VET Enrolments",
+      url: "https://discover.data.vic.gov.au/dataset/vocational-education-and-training-course-enrolments-by-training-package",
+      description: "Victorian Government statistics on vocational training course enrolments by training package.",
+    },
   ] as const;
 
   // Steps passed to the reusable grid (icons, ids, titles, descriptions)
@@ -161,6 +167,13 @@ export default function AnalyzerIntro(): React.ReactElement {
     },
   ];
 
+  const inlineCta = (
+    <div className="max-w-7xl mx-auto text-center">
+      <p className="text-ink-soft mb-3">Want to find roles that fit you?</p>
+      <Button to="/analyzer/get-info">Take analyzer test now</Button>
+    </div>
+  );
+
   return (
     <>
       {/* Full-bleed hero: expands to screen width and touches header (no top gap) */}
@@ -177,13 +190,7 @@ export default function AnalyzerIntro(): React.ReactElement {
 
       {/* Main content, centered and constrained */}
       <main className="px-4 sm:px-6 lg:px-8 py-16">
-        {/* Small screens (<lg): show a regular CTA at page bottom to avoid overlay */}
-        <div className="block lg:hidden mt-16">
-          <div className="max-w-7xl mx-auto text-center">
-            <p className="text-ink-soft mb-3">Want to find roles that fit you?</p>
-            <Button to="/analyzer/get-info">Take analyzer test now</Button>
-          </div>
-        </div>
+
 
         {/* Why choose us */}
         <section className="max-w-7xl mx-auto text-center">
@@ -228,7 +235,12 @@ export default function AnalyzerIntro(): React.ReactElement {
           </p>
 
           {/* pass labelledById to link region to the H2 above. */}
-          <HowItWorksGrid steps={steps} labelledById="how-it-works" className="mt-6" />
+          <HowItWorksGrid
+            steps={steps}
+            labelledById="how-it-works"
+            className="mt-6"
+            columns={steps.length}
+          />
         </section>
 
         {/* Data sources section */}
@@ -243,6 +255,10 @@ export default function AnalyzerIntro(): React.ReactElement {
 
         {/* Footer sentinel to push the floating CTA up before the actual footer */}
         <div ref={footerSentinelRef} aria-hidden className="h-1 w-full" />
+
+        {/* Inline CTA: show on small screens; on desktop only while hero visible (no floating button) */}
+        <div className="mt-16 lg:hidden">{inlineCta}</div>
+        {heroInView && <div className="mt-16 hidden lg:block">{inlineCta}</div>}
       </main>
 
       {/* Large screens (>=lg): fixed bottom-right CTA that pushes up when footer enters */}
