@@ -107,7 +107,7 @@ export default function VetGlossarySuggest({
           type="text"
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
-          placeholder="Enter a prefix, e.g., q / qa / exd"
+          placeholder="Enter a prefix or a keyword"
           className="w-full px-4 py-2 pr-10 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
           aria-label="Search VET terminology"
           onFocus={() => {
