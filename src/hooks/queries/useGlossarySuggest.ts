@@ -4,11 +4,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { getListByPrefix, type GlossaryDetail } from "../../lib/api/glossary/getListByPrefix";
 
-/** Detect AbortError (timeout or externally aborted) */
-function isAbortError(e: unknown): boolean {
-  return e instanceof DOMException && e.name === "AbortError";
-}
-
 /** Try once with given timeout; if timeout and not externally aborted, try again with a longer timeout. */
 async function fetchWithTimeoutCascade(
   prefix: string,
