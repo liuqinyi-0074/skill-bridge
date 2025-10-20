@@ -159,17 +159,8 @@ export const getProfileTutorialSteps = (): TutorialStep[] => [
     placement: "left",
   },
 
-  // Step 16: Tutorial replay reminder
-  {
-    id: "tutorial-replay",
-    target: "#profile-header button[aria-label*='Tutorial']",
-    title: "Replay This Tutorial",
-    content:
-      "You can replay this tutorial anytime by clicking the 'View Tutorial' button at the top of the page. Perfect for when you need a refresher on any feature!",
-    placement: "left",
-  },
 
-  // Step 17: Final summary and action plan
+  // Step 16: Final summary and action plan
   {
     id: "final-action-plan",
     target: "#profile-header",

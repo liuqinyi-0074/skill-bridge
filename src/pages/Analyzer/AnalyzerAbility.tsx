@@ -312,7 +312,7 @@ function PageImpl(
       {apiEmpty && (
         <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4 text-blue-900">
           <p className="mb-3">
-            The occupation you selected has no required abilities in our data. You can customize abilities manually, or go back to choose another occupation.
+            The occupation you selected has no required abilities in official data. You can customize abilities manually, go back to choose another occupation, or try selecting a similar one.
           </p>
           <div className="flex gap-3">
             <Button onClick={openManual}>Customize</Button>

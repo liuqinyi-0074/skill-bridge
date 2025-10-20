@@ -1,29 +1,31 @@
+// Profile.tsx
 // Profile page with tutorial matching Insight page style
 // - Uses TutorialLauncher in the header (top-right corner)
 // - Export PDF button always visible (mobile + desktop)
 // - Shows skill roadmap from unmatched abilities
 // - Auto-fetches training advice
-// - VET glossary search for terminology lookup
+// - NEW: VET glossary suggest component (names-only list + click to show details)
 
-
-import React, { useEffect, useMemo, useRef, useState } from "react"
-import { useLocation, useNavigate } from "react-router-dom"
-import { useSelector } from "react-redux"
-import type { RootState } from "../store"
-import { useAppDispatch } from "../store/hooks"
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
+import type { RootState } from "../store";
+import { useAppDispatch } from "../store/hooks";
 
 // UI Components
-import HelpToggleSmall from "../components/ui/HelpToggleSmall"
+import HelpToggleSmall from "../components/ui/HelpToggleSmall";
 import CareerChoicePanel, {
   type CareerChoiceState,
   type OccupationSearchInputs,
-} from "../components/profile/CareerChoicePanel"
-import SkillRoadMap, { type SkillRoadmapItem } from "../components/profile/SkillRoadMap"
-import TrainingAdviceList, { type TrainingAdvice } from "../components/profile/TrainingAdviceList"
-import VetGlossarySearch from "../components/profile/VetGlossarySearch"
-import TutorialLauncher from "../components/tutorial/TutorialLauncher"
-import { useTrainingAdvice } from "../hooks/queries/useTrainingAdvice"
+} from "../components/profile/CareerChoicePanel";
+import SkillRoadMap, { type SkillRoadmapItem } from "../components/profile/SkillRoadMap";
+import TrainingAdviceList, { type TrainingAdvice } from "../components/profile/TrainingAdviceList";
+// REPLACED: old search -> new suggest component
+import VetGlossarySuggest from "../components/profile/VetGlossarySuggestion";
+import TutorialLauncher from "../components/tutorial/TutorialLauncher";
+import { useTrainingAdvice } from "../hooks/queries/useTrainingAdvice";
 import Button from "../components/ui/Button";
+
 // Redux actions + types
 import {
   setChosenRoles,
@@ -32,26 +34,26 @@ import {
   setPreferredRegion,
   setSelectedJob,
   setTrainingAdvice,
-} from "../store/analyzerSlice"
+} from "../store/analyzerSlice";
 import type {
   AbilityLite,
   UnmatchedBuckets,
   RoleLite,
   SelectedJob,
   TrainingAdviceState,
-} from "../store/analyzerSlice"
+} from "../store/analyzerSlice";
 
 // Data and hooks
-import { industryOptions, industryNameOf } from "../data/industries"
-import { useAnzscoSearch } from "../hooks/queries/userAnzscoSearch"
-import type { SearchParams } from "../hooks/queries/userAnzscoSearch"
-import { getProfileTutorialSteps } from "../data/ProfileTutorialSteps"
-import type { AnalyzerRouteState } from "../types/routes"
-import type { AnzscoOccupation } from "../types/domain"
-import type { TrainingAdviceRes, TrainingCourse } from "../types/training"
+import { industryOptions, industryNameOf } from "../data/industries";
+import { useAnzscoSearch } from "../hooks/queries/userAnzscoSearch";
+import type { SearchParams } from "../hooks/queries/userAnzscoSearch";
+import { getProfileTutorialSteps } from "../data/ProfileTutorialSteps";
+import type { AnalyzerRouteState } from "../types/routes";
+import type { AnzscoOccupation } from "../types/domain";
+import type { TrainingAdviceRes, TrainingCourse } from "../types/training";
 
 // Utils
-import { exportElementToPdf } from "../lib/utils/pdf"
+import { exportElementToPdf } from "../lib/utils/pdf";
 
 // ============================================================================
 // Constants
@@ -65,12 +67,12 @@ const REGION_OPTIONS = [
   "Tasmania",
   "Northern Territory",
   "Australian Capital Territory",
-]
+];
 
 // ============================================================================
 // Types
 // ============================================================================
-type SelectedJobValue = Exclude<SelectedJob, null>
+type SelectedJobValue = Exclude<SelectedJob, null>;
 
 // ============================================================================
 // Helper Functions
@@ -78,118 +80,118 @@ type SelectedJobValue = Exclude<SelectedJob, null>
 
 /** Generate fallback URL for a course code */
 const fallbackCourseUrl = (code: string): string =>
-  `https://training.gov.au/training/details/${encodeURIComponent(code)}`
+  `https://training.gov.au/training/details/${encodeURIComponent(code)}`;
 
 /** Safe string normalization */
-const normName = (v: unknown): string => (typeof v === "string" ? v : "")
+const normName = (v: unknown): string => (typeof v === "string" ? v : "");
 
 /** Normalize roles array with deduplication */
 const normalizeRoles = (roles: Array<RoleLite | string> | null | undefined): RoleLite[] => {
-  if (!Array.isArray(roles)) return []
-  const seen = new Set<string>()
-  const out: RoleLite[] = []
+  if (!Array.isArray(roles)) return [];
+  const seen = new Set<string>();
+  const out: RoleLite[] = [];
   for (const role of roles) {
-    if (!role) continue
-    const id = (typeof role === "string" ? role : role.id ?? "").trim()
-    if (!id || seen.has(id)) continue
-    seen.add(id)
-    const title = typeof role === "string" ? role : role.title || id
-    out.push({ id, title })
+    if (!role) continue;
+    const id = (typeof role === "string" ? role : role.id ?? "").trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    const title = typeof role === "string" ? role : role.title || id;
+    out.push({ id, title });
   }
-  return out
-}
+  return out;
+};
 
 /** Normalize selected job */
 const normalizeSelectedJob = (
   job: SelectedJob | string | null | undefined
 ): SelectedJobValue | null => {
-  if (!job) return null
+  if (!job) return null;
   if (typeof job === "string") {
-    const code = job.trim()
-    if (!code) return null
-    return { code, title: code }
+    const code = job.trim();
+    if (!code) return null;
+    return { code, title: code };
   }
-  const code = (job.code ?? "").trim()
-  if (!code) return null
-  return { code, title: job.title || code }
-}
+  const code = (job.code ?? "").trim();
+  if (!code) return null;
+  return { code, title: job.title || code };
+};
 
 /** Generate unique key for ability */
 const abilityKey = (a: AbilityLite): string | null => {
-  const name = normName((a as { name?: unknown }).name)
+  const name = normName((a as { name?: unknown }).name);
   const code =
-    typeof (a as { code?: unknown }).code === "string" ? (a as { code?: string }).code : ""
-  if (!name && !code) return null
-  return `${a.aType}:${code || name.toLowerCase()}`
-}
+    typeof (a as { code?: unknown }).code === "string" ? (a as { code?: string }).code : "";
+  if (!name && !code) return null;
+  return `${a.aType}:${code || name.toLowerCase()}`;
+};
 
 /** Generate unique key for roadmap item */
 const roadmapKey = (it: SkillRoadmapItem): string | null => {
-  const name = normName((it as { skill?: unknown }).skill)
+  const name = normName((it as { skill?: unknown }).skill);
   const code =
-    typeof (it as { code?: unknown }).code === "string" ? (it as { code?: string }).code : ""
-  if (!name && !code) return null
-  return `${it.abilityType}:${code || name.toLowerCase()}`
-}
+    typeof (it as { code?: unknown }).code === "string" ? (it as { code?: string }).code : "";
+  if (!name && !code) return null;
+  return `${it.abilityType}:${code || name.toLowerCase()}`;
+};
 
 /** Generate identity key for ability */
 const abilityIdentityKey = (ability: AbilityLite): string => {
-  const name = normName(ability.name)
-  const base = ability.code ?? name
-  const safe = base ? encodeURIComponent(base) : `unnamed-${ability.aType}`
-  return `${ability.aType}:${safe}`
-}
+  const name = normName(ability.name);
+  const base = ability.code ?? name;
+  const safe = base ? encodeURIComponent(base) : `unnamed-${ability.aType}`;
+  return `${ability.aType}:${safe}`;
+};
 
 /** Remove duplicate abilities */
 const uniqueAbilities = (abilities: AbilityLite[]): AbilityLite[] => {
-  const seen = new Set<string>()
-  const result: AbilityLite[] = []
+  const seen = new Set<string>();
+  const result: AbilityLite[] = [];
   for (const a of abilities) {
-    const k = abilityKey(a)
-    const name = normName(a.name)
-    if (!k || !name) continue
+    const k = abilityKey(a);
+    const name = normName(a.name);
+    if (!k || !name) continue;
     if (!seen.has(k)) {
-      seen.add(k)
-      result.push({ ...a, name })
+      seen.add(k);
+      result.push({ ...a, name });
     }
   }
-  return result
-}
+  return result;
+};
 
 /** Collapse unmatched buckets into flat ability array */
 const collapseUnmatchedBuckets = (b: UnmatchedBuckets | null | undefined): AbilityLite[] => {
-  if (!b) return []
+  if (!b) return [];
   const extract = (entry: unknown): { name: string; code?: string } | null => {
     if (typeof entry === "string") {
-      const trimmed = entry.trim()
-      return trimmed ? { name: trimmed } : null
+      const trimmed = entry.trim();
+      return trimmed ? { name: trimmed } : null;
     }
     if (entry && typeof entry === "object") {
-      const obj = entry as { name?: unknown; title?: unknown; label?: unknown; code?: unknown }
+      const obj = entry as { name?: unknown; title?: unknown; label?: unknown; code?: unknown };
       const code =
-        typeof obj.code === "string" && obj.code.trim().length > 0 ? obj.code.trim() : undefined
+        typeof obj.code === "string" && obj.code.trim().length > 0 ? obj.code.trim() : undefined;
       const candidate =
         (typeof obj.name === "string" && obj.name.trim()) ||
         (typeof obj.title === "string" && obj.title.trim()) ||
         (typeof obj.label === "string" && obj.label.trim()) ||
         code ||
-        ""
-      const name = candidate.trim()
-      return name ? { name, code } : null
+        "";
+      const name = candidate.trim();
+      return name ? { name, code } : null;
     }
-    return null
-  }
+    return null;
+  };
   const collect = (list: unknown[] | undefined, aType: AbilityLite["aType"]): AbilityLite[] =>
     (list ?? [])
       .map(extract)
       .filter((item): item is { name: string; code?: string } => item !== null)
-      .map((item) => ({ name: item.name, code: item.code, aType }))
+      .map((item) => ({ name: item.name, code: item.code, aType }));
   return [
     ...collect(b.skill as unknown[] | undefined, "skill"),
     ...collect(b.knowledge as unknown[] | undefined, "knowledge"),
     ...collect(b.tech as unknown[] | undefined, "tech"),
-  ]
-}
+  ];
+};
 
 /** Convert abilities to skill roadmap items */
 const toSkillRoadmapItems = (abilities: AbilityLite[]): SkillRoadmapItem[] =>
@@ -199,36 +201,36 @@ const toSkillRoadmapItems = (abilities: AbilityLite[]): SkillRoadmapItem[] =>
     category: ability.aType,
     skill: normName(ability.name),
     code: typeof ability.code === "string" ? ability.code : undefined,
-  }))
+  }));
 
 /** Deduplicate roadmap items */
 const dedupeRoadmapItems = (items: SkillRoadmapItem[]): SkillRoadmapItem[] => {
-  const seen = new Set<string>()
-  const result: SkillRoadmapItem[] = []
+  const seen = new Set<string>();
+  const result: SkillRoadmapItem[] = [];
   for (const it of items) {
-    const k = roadmapKey(it)
-    if (!k) continue
+    const k = roadmapKey(it);
+    if (!k) continue;
     if (!seen.has(k)) {
-      seen.add(k)
-      result.push(it)
+      seen.add(k);
+      result.push(it);
     }
   }
-  return result
-}
+  return result;
+};
 
 /** Map training API response to Redux state */
 const mapAdviceResToState = (
   res: TrainingAdviceRes | null | undefined,
   fallbackOccupation: { code: string; title: string }
 ): TrainingAdviceState => {
-  const occupation = res?.anzsco ?? fallbackOccupation
-  const rawCourses = res?.vet_courses ?? []
+  const occupation = res?.anzsco ?? fallbackOccupation;
+  const rawCourses = res?.vet_courses ?? [];
   const courses: TrainingCourse[] = rawCourses.map((c) => ({
     id: c.vet_course_code,
     name: c.course_name || c.vet_course_code,
-  }))
-  return { occupation, courses }
-}
+  }));
+  return { occupation, courses };
+};
 
 /** SelectQuestion modal for region selection */
 function SelectQuestion({
@@ -240,21 +242,21 @@ function SelectQuestion({
   onSave,
   helperText,
 }: {
-  title: string
-  open: boolean
-  options: string[]
-  value: string | null
-  onClose: () => void
-  onSave: (value: string) => void
-  helperText?: string
+  title: string;
+  open: boolean;
+  options: string[];
+  value: string | null;
+  onClose: () => void;
+  onSave: (value: string) => void;
+  helperText?: string;
 }): React.ReactElement | null {
-  const [selected, setSelected] = useState<string | null>(value)
+  const [selected, setSelected] = useState<string | null>(value);
 
   useEffect(() => {
-    setSelected(value)
-  }, [value])
+    setSelected(value);
+  }, [value]);
 
-  if (!open) return null
+  if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -282,8 +284,8 @@ function SelectQuestion({
         <div className="flex gap-3">
           <button
             onClick={() => {
-              if (selected) onSave(selected)
-              onClose()
+              if (selected) onSave(selected);
+              onClose();
             }}
             className="flex-1 rounded-full bg-primary py-2 px-4 font-semibold text-ink-invert transition hover:bg-primary/90"
           >
@@ -298,118 +300,117 @@ function SelectQuestion({
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 // ============================================================================
 // Main Component
 // ============================================================================
 export default function Profile(): React.ReactElement {
-  const dispatch = useAppDispatch()
-  const { state } = useLocation()
+  const dispatch = useAppDispatch();
+  const { state } = useLocation();
   const navigate = useNavigate();
-  const routeState = (state as (AnalyzerRouteState & { notice?: string }) | undefined) ?? undefined
-  const [routeHydrated, setRouteHydrated] = useState(false)
+  const routeState = (state as (AnalyzerRouteState & { notice?: string }) | undefined) ?? undefined;
+  const [routeHydrated, setRouteHydrated] = useState(false);
 
   // Refs
-  const exportRef = useRef<HTMLDivElement | null>(null)
-  const vetTerminologyRef = useRef<HTMLDivElement>(null)
+  const exportRef = useRef<HTMLDivElement | null>(null);
+  const vetTerminologyRef = useRef<HTMLDivElement>(null);
 
   // Redux state
-  const analyzer = useSelector((s: RootState) => s.analyzer)
-  const notice = routeState?.notice
+  const analyzer = useSelector((s: RootState) => s.analyzer);
+  const notice = routeState?.notice;
 
   // Hydrate from route state (one-time)
   useEffect(() => {
     if (routeState) {
       if (!analyzer.chosenRoles?.length && routeState.roles?.length) {
-        dispatch(setChosenRoles(normalizeRoles(routeState.roles)))
+        dispatch(setChosenRoles(normalizeRoles(routeState.roles)));
       }
       if (!analyzer.chosenAbilities?.length && routeState.abilities?.length) {
-        dispatch(setChosenAbilities(routeState.abilities))
+        dispatch(setChosenAbilities(routeState.abilities));
       }
       if (
         (!analyzer.interestedIndustryCodes || analyzer.interestedIndustryCodes.length === 0) &&
         routeState.industries?.length
       ) {
-        dispatch(setInterestedIndustryCodes(routeState.industries))
+        dispatch(setInterestedIndustryCodes(routeState.industries));
       }
       if (!analyzer.preferredRegion && routeState.region) {
-        dispatch(setPreferredRegion(routeState.region))
+        dispatch(setPreferredRegion(routeState.region));
       }
       if (!analyzer.selectedJob && routeState.selectedJob) {
-        const normalized = normalizeSelectedJob(routeState.selectedJob)
-        if (normalized) dispatch(setSelectedJob(normalized))
+        const normalized = normalizeSelectedJob(routeState.selectedJob);
+        if (normalized) dispatch(setSelectedJob(normalized));
       }
       if (!analyzer.trainingAdvice && routeState.training) {
-        dispatch(setTrainingAdvice(routeState.training))
+        dispatch(setTrainingAdvice(routeState.training));
       }
     }
-    setRouteHydrated(true)
+    setRouteHydrated(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, []);
 
   // Career choice value
   const careerChoiceValue = useMemo((): CareerChoiceState => {
-    const pastJobsRedux = normalizeRoles(analyzer.chosenRoles)
-    const targetJobRedux = normalizeSelectedJob(analyzer.selectedJob)
-    const regionRedux = analyzer.preferredRegion || ""
+    const pastJobsRedux = normalizeRoles(analyzer.chosenRoles);
+    const targetJobRedux = normalizeSelectedJob(analyzer.selectedJob);
+    const regionRedux = analyzer.preferredRegion || "";
 
-    const pastJobsRoute = normalizeRoles(routeState?.roles)
-    const targetJobRoute = normalizeSelectedJob(routeState?.selectedJob)
-    const regionRoute = routeState?.region || ""
+    const pastJobsRoute = normalizeRoles(routeState?.roles);
+    const targetJobRoute = normalizeSelectedJob(routeState?.selectedJob);
+    const regionRoute = routeState?.region || "";
 
-    const pastJobs =
-      pastJobsRedux.length > 0 || routeHydrated ? pastJobsRedux : pastJobsRoute
-    const targetJobSource = targetJobRedux ?? (routeHydrated ? null : targetJobRoute)
-    const targetJob = targetJobSource ? { id: targetJobSource.code, title: targetJobSource.title } : null
-    const region = routeHydrated ? regionRedux : regionRedux || regionRoute
+    const pastJobs = pastJobsRedux.length > 0 || routeHydrated ? pastJobsRedux : pastJobsRoute;
+    const targetJobSource = targetJobRedux ?? (routeHydrated ? null : targetJobRoute);
+    const targetJob = targetJobSource ? { id: targetJobSource.code, title: targetJobSource.title } : null;
+    const region = routeHydrated ? regionRedux : regionRedux || regionRoute;
 
-    return { pastJobs, targetJob, region }
-  }, [analyzer, routeState, routeHydrated])
+    return { pastJobs, targetJob, region };
+  }, [analyzer, routeState, routeHydrated]);
 
   // Handle career choice changes
   const onCareerChoiceChange = (next: CareerChoiceState): void => {
-    dispatch(setChosenRoles(normalizeRoles(next.pastJobs)))
-    const targetJobForRedux = next.targetJob ? { code: next.targetJob.id, title: next.targetJob.title } : null
-    dispatch(setSelectedJob(targetJobForRedux))
-    dispatch(setPreferredRegion(next.region))
-  }
+    dispatch(setChosenRoles(normalizeRoles(next.pastJobs)));
+    const targetJobForRedux = next.targetJob ? { code: next.targetJob.id, title: next.targetJob.title } : null;
+    dispatch(setSelectedJob(targetJobForRedux));
+    dispatch(setPreferredRegion(next.region));
+  };
 
   // Training advice fetch
-  const selectedJobCode = analyzer.selectedJob?.code ?? ""
-  const selectedJobTitle = analyzer.selectedJob?.title ?? ""
+  const selectedJobCode = analyzer.selectedJob?.code ?? "";
+  const selectedJobTitle = analyzer.selectedJob?.title ?? "";
   const {
     data: trainingData,
     isFetching: trainingFetching,
     isError: trainingError,
-  } = useTrainingAdvice(selectedJobCode)
+  } = useTrainingAdvice(selectedJobCode);
 
   useEffect(() => {
-    if (!trainingData || trainingFetching || trainingError) return
-    const mapped = mapAdviceResToState(trainingData, { code: selectedJobCode, title: selectedJobTitle })
-    dispatch(setTrainingAdvice(mapped))
-  }, [trainingData, trainingFetching, trainingError, selectedJobCode, selectedJobTitle, dispatch])
+    if (!trainingData || trainingFetching || trainingError) return;
+    const mapped = mapAdviceResToState(trainingData, { code: selectedJobCode, title: selectedJobTitle });
+    dispatch(setTrainingAdvice(mapped));
+  }, [trainingData, trainingFetching, trainingError, selectedJobCode, selectedJobTitle, dispatch]);
 
   // Training items
   const trainingItems: TrainingAdvice[] = useMemo(() => {
-    const courses = analyzer.trainingAdvice?.courses ?? []
+    const courses = analyzer.trainingAdvice?.courses ?? [];
     return courses.map((c) => ({
       title: c.name ?? c.id,
       code: c.id,
       url: c.url ?? fallbackCourseUrl(c.id),
-    }))
-  }, [analyzer.trainingAdvice])
+    }));
+  }, [analyzer.trainingAdvice]);
 
   // Occupation search
-  const [industryCode, setIndustryCode] = useState("")
-  const [keyword, setKeyword] = useState("")
-  const [searchParams, setSearchParams] = useState<SearchParams>(null)
-  const { data: searchDataRaw, isFetching, isError } = useAnzscoSearch(searchParams)
+  const [industryCode, setIndustryCode] = useState("");
+  const [keyword, setKeyword] = useState("");
+  const [searchParams, setSearchParams] = useState<SearchParams>(null);
+  const { data: searchDataRaw, isFetching, isError } = useAnzscoSearch(searchParams);
   const normalizedResults: AnzscoOccupation[] = useMemo(
     () => (Array.isArray(searchDataRaw) ? searchDataRaw : []),
     [searchDataRaw]
-  )
+  );
 
   const occupationSearch: OccupationSearchInputs = {
     industryOptions: industryOptions.map((opt) => ({ value: opt.value, label: opt.label })),
@@ -418,39 +419,40 @@ export default function Profile(): React.ReactElement {
     keyword,
     onKeywordChange: setKeyword,
     onSearch: () => {
-      const industryName = industryNameOf(industryCode) ?? ""
+      const industryName = industryNameOf(industryCode) ?? "";
       if (industryName || keyword.trim()) {
-        setSearchParams({ industry: industryName, keyword: keyword.trim(), limit: 20 })
+        setSearchParams({ industry: industryName, keyword: keyword.trim(), limit: 20 });
       }
     },
     results: normalizedResults,
     isFetching,
     isError,
     noResults: !isFetching && normalizedResults.length === 0,
-  }
+  };
 
   // Skill roadmap from unmatched
-  const unmatchedRedux = analyzer.selectedJobUnmatched
-  const unmatchedRoute = routeState?.unmatched ?? null
+  const unmatchedRedux = analyzer.selectedJobUnmatched;
+  const unmatchedRoute = routeState?.unmatched ?? null;
   const abilitiesFromUnmatched = useMemo(() => {
-    const source = unmatchedRedux ?? unmatchedRoute ?? null
-    return uniqueAbilities(collapseUnmatchedBuckets(source))
-  }, [unmatchedRedux, unmatchedRoute])
+    const source = unmatchedRedux ?? unmatchedRoute ?? null;
+    return uniqueAbilities(collapseUnmatchedBuckets(source));
+  }, [unmatchedRedux, unmatchedRoute]);
 
   const initialRoadmap = useMemo(() => {
-    const items = dedupeRoadmapItems(toSkillRoadmapItems(abilitiesFromUnmatched))
-    const key = `unmatched:${items.length}`
-    return { key, items }
-  }, [abilitiesFromUnmatched])
+    const items = dedupeRoadmapItems(toSkillRoadmapItems(abilitiesFromUnmatched));
+    const key = `unmatched:${items.length}`;
+    return { key, items };
+  }, [abilitiesFromUnmatched]);
 
   // Export PDF
   const onExportPdf = async (): Promise<void> => {
-    if (!exportRef.current) return
-    const code = analyzer.selectedJob?.code ? `_${analyzer.selectedJob.code}` : ""
-    const fileName = `Profile${code}.pdf`
-    await exportElementToPdf(exportRef.current, fileName)
-  }
-   const canGoInsight: boolean = Boolean(analyzer.selectedJob?.code);
+    if (!exportRef.current) return;
+    const code = analyzer.selectedJob?.code ? `_${analyzer.selectedJob.code}` : "";
+    const fileName = `Profile${code}.pdf`;
+    await exportElementToPdf(exportRef.current, fileName);
+  };
+
+  const canGoInsight: boolean = Boolean(analyzer.selectedJob?.code);
   const onGoToInsight = (): void => {
     if (!canGoInsight) return;
     navigate("/insight", {
@@ -462,8 +464,6 @@ export default function Profile(): React.ReactElement {
     <div id="profile-export-root" ref={exportRef}>
       {/* Header with tutorial button via TutorialLauncher */}
       <div id="profile-header" className="relative bg-white px-4 py-12 sm:px-6 lg:px-8">
-        {/* Tutorial button in the top-right corner.
-           Header on this page is not fixed inside this block, so no headerOffset needed. */}
         <TutorialLauncher
           steps={getProfileTutorialSteps}
           placement="top-right"
@@ -516,7 +516,7 @@ export default function Profile(): React.ReactElement {
       <div className="mx-auto max-w-7xl space-y-8 px-4 py-12 sm:px-6 lg:px-8">
         {/* Career Intent Section */}
         <section id="career-intent" className="relative">
-          {/* Export PDF button — always visible now (removed `hidden sm:block`) */}
+          {/* Export PDF button — always visible now */}
           <div className="absolute right-0 -top-6 sm:-top-8">
             <button
               onClick={onExportPdf}
@@ -539,21 +539,18 @@ export default function Profile(): React.ReactElement {
             occupationSearch={occupationSearch}
           />
         </section>
-        {/* Insight CTA (screenshot style: large muted panel, text on top-left, button below) */}
+
+        {/* Insight CTA */}
         <section id="insight-cta" className="mx-auto mt-10 max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
-          <div
-            className="rounded-3xl bg-slate-100 p-6 sm:p-8"
-          >
-            {/* Headline text */}
+          <div className="rounded-3xl bg-slate-100 p-6 sm:p-8">
             <p className=" text-lg font-small leading-7 text-ink sm:text-2xl">
               Want to see how your profile matches with market trends and opportunities?
             </p>
 
-            {/* Primary button kept with your original color scheme */}
             <div className="mt-4">
               <Button
                 id="go-insight"
-                variant="primary"      
+                variant="primary"
                 size="md"
                 onClick={onGoToInsight}
                 disabled={!canGoInsight}
@@ -561,7 +558,7 @@ export default function Profile(): React.ReactElement {
                 aria-label="View Personal Data Insights"
                 className="inline-flex items-center gap-2 rounded-xl px-5 py-3 text-base"
               >
-                <span>View Personal Data Insights</span>  
+                <span>View Personal Data Insights</span>
                 <svg
                   className="h-5 w-5"
                   viewBox="0 0 24 24"
@@ -579,7 +576,6 @@ export default function Profile(): React.ReactElement {
             </div>
           </div>
         </section>
-
 
         {/* Skill Roadmap Section */}
         <section id="skill-roadmap">
@@ -623,13 +619,13 @@ export default function Profile(): React.ReactElement {
               items={trainingItems}
               title=""
               onRemove={(item) => {
-                const updated = trainingItems.filter((t) => t.code !== item.code)
+                const updated = trainingItems.filter((t) => t.code !== item.code);
                 dispatch(
                   setTrainingAdvice({
                     occupation: analyzer.trainingAdvice?.occupation || { code: "", title: "" },
                     courses: updated.map((t) => ({ id: t.code, name: t.title, url: t.url })),
                   })
-                )
+                );
               }}
             />
 
@@ -671,14 +667,14 @@ export default function Profile(): React.ReactElement {
             <HelpToggleSmall
               placement="left"
               openOn="both"
-              text="Search for any VET term or acronym to see its definition and related terms."
+              text="Search for any VET term prefix to see suggestions. Click a term to see details."
             />
           </div>
 
-          <VetGlossarySearch />
+          {/* NEW: Use the new suggest UI */}
+          <VetGlossarySuggest />
         </section>
-
       </div>
     </div>
-  )
+  );
 }

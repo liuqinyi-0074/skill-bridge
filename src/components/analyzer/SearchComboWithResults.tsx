@@ -195,8 +195,8 @@ const SearchComboWithResults: React.FC<SearchComboWithResultsProps> = ({
 
       {noResults && englishOk && !isFetching && !tooLong && (
         <div className="mt-3 rounded-md bg-blue-50 p-3 text-sm text-blue-900">
-          This industry does not contain roles matching your keyword. Please verify your input or try a different
-          industry.
+          No roles found for this keyword in the selected industry based on the Australian ANZSCO occupation list.
+           Please verify your input or try a different industry.
         </div>
       )}
 

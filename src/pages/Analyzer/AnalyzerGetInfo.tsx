@@ -252,13 +252,14 @@ function PageBody(): React.ReactElement {
         features: [
           "Search for occupations by industry and keyword (up to 5 selections).",
           "Choose your preferred work location in Australia.",
-          "Select industries that interest you (multi-select, up to 20).",
+          "Select industries that interest you.",
         ],
         tips: [
           "Use the Search function to explore roles; submit selections with the chip.",
           "Re-search anytime — same params refetch; Remove chips via ×.",
           "Check the summary sidebar on the right to review your current selections at any time.",
           "Hover over the disabled 'Next' button to see what's required to proceed.",
+          "All occupations are based on the official Australian ANZSCO occupation list.",
         ],
       }}
       summaryDrafts={{
