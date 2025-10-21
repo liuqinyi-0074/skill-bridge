@@ -5,7 +5,7 @@ import ReactDOM from "react-dom/client";
 import { Provider } from "react-redux";
 import { PersistGate } from "redux-persist/integration/react";
 import { BrowserRouter } from "react-router-dom";
-
+import { registerSW } from 'virtual:pwa-register';
 import App from "./App";
 import { store, persistor } from "./store";
 import { registerDefaultSummaryBuilders } from "./summary/defaultBuilders";
@@ -16,6 +16,11 @@ initSentry();
 registerDefaultSummaryBuilders();
 registerAbilityCountsBuilder();
 registerJobSummaryBuilder();
+registerSW({
+  // Called when a new SW is available; we ask it to apply immediately.
+  onNeedRefresh() { /* You could show a toast; plugin can auto-update */ },
+  onOfflineReady() { /* App shell is cached for offline usage */ }
+});
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <!-- Home Page -->
+  <url>
+    <loc>https://skill-bridge-ruddy-sigma.vercel.app/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+
+  <!-- Analyzer Flow Pages -->
+  <url>
+    <loc>https://skill-bridge-ruddy-sigma.vercel.app/analyzer/intro</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://skill-bridge-ruddy-sigma.vercel.app/analyzer/get-info</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://skill-bridge-ruddy-sigma.vercel.app/analyzer/abilities</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://skill-bridge-ruddy-sigma.vercel.app/analyzer/job-suggestion</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://skill-bridge-ruddy-sigma.vercel.app/analyzer/skill-gap</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://skill-bridge-ruddy-sigma.vercel.app/analyzer/training</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- Insight Pages -->
+  <url>
+    <loc>https://skill-bridge-ruddy-sigma.vercel.app/insight</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <!-- Optional: Add specific occupation insight pages -->
+  <!-- Example:
+  <url>
+    <loc>https://skill-bridge-ruddy-sigma.vercel.app/insight/123456</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  -->
+
+  <!-- Profile Page -->
+  <url>
+    <loc>https://skill-bridge-ruddy-sigma.vercel.app/profile</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+
+  <!-- Feedback Page -->
+  <url>
+    <loc>https://skill-bridge-ruddy-sigma.vercel.app/feedback</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.4</priority>
+  </url>
+
+  <!-- Legal Pages -->
+  <url>
+    <loc>https://skill-bridge-ruddy-sigma.vercel.app/privacy-policy</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://skill-bridge-ruddy-sigma.vercel.app/terms</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+</urlset>
