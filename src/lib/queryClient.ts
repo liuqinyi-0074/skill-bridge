@@ -7,7 +7,9 @@ export const queryClient = new QueryClient({
     queries: {
       staleTime: 60 * 1000,         // 1 min fresh by default
       gcTime: 6 * 60 * 60 * 1000,   // keep cache for 6h
-      retry: 1,
+      retry: false,
+      networkMode: "always",
+      refetchOnReconnect: false,
       refetchOnWindowFocus: false,
     },
   },

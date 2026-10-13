@@ -1,3 +1,5 @@
+import { APP_CONFIG } from "./config/runtime";
+import { safeStorage } from "./store/browserStorage";
 // src/App.tsx
 // App shell with route-level code splitting, layout wrapper, and a simple password gate.
 // Notes:
@@ -14,7 +16,7 @@ import AnalyzerEntry from "./pages/Analyzer/AnalyzerEntry"
 import { useAppDispatch, useAppSelector } from "./store/hooks"
 import { resetAnalyzer } from "./store/analyzerSlice"
 
-const PASSWORD: string | undefined = import.meta.env.VITE_SITE_PASSWORD
+const PASSWORD: string | undefined = APP_CONFIG.sitePassword
 
 const Home = lazy(() => import("./pages/Home"))
 const Insight = lazy(() => import("./pages/Insight"))
@@ -60,7 +62,7 @@ function PasswordGate(props: { children: React.ReactElement }): React.ReactEleme
   // Read initial unlock state from localStorage.
   const [unlocked, setUnlocked] = useState<boolean>(() => {
     if (!shouldGate) return true
-    return localStorage.getItem(vaultKey) === "1"
+    return safeStorage.getItem(vaultKey) === "1"
   })
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
@@ -71,7 +73,7 @@ function PasswordGate(props: { children: React.ReactElement }): React.ReactEleme
       return
     }
     if (input === PASSWORD) {
-      localStorage.setItem(vaultKey, "1")
+      safeStorage.setItem(vaultKey, "1")
       setUnlocked(true)
       setError("")
       navigate("/")

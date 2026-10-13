@@ -18,7 +18,7 @@ export function useAnzscoSearch(params: SearchParams) {
     gcTime: 60 * 60 * 1000,
     refetchOnMount: "always",
     refetchOnWindowFocus: false,
-    retry: 1,
+    retry: false,
     queryFn: async () => {
       const res = await searchOccupations(industry, keyword, limit);
       return res.items.map(mapSearchItemToDomain);

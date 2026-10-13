@@ -73,7 +73,7 @@ export function useCareerGrowth(
     gcTime: 15 * 60 * 1000,
     
     // Retry twice on failure
-    retry: 2,
+    retry: false,
     
     // Wait 1 second between retries
     retryDelay: 1000,
