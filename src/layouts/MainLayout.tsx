@@ -1,8 +1,12 @@
-// Layout that renders Header and Footer once, and an <Outlet /> in between.
+import ServiceUnavailable from "../components/ServiceUnavailable"
+import { isServiceUnavailable, subscribeToService } from "../lib/services/availability"
+import { DEMO_MODE } from "../lib/demo/mode"
+import DemoMode from "../components/DemoMode"
+// Layout that renders Header and Footer once, with the active route or outage page.
 // Also scrolls to top on route change for better UX.
 
 import { Outlet, useLocation } from "react-router-dom"
-import { useEffect, useRef, useMemo } from "react"
+import { useEffect, useRef, useMemo, useSyncExternalStore } from "react"
 import Header from "../components/Header"
 import Footer from "../components/Footer"
 const TRANSPARENT_ROUTES = new Set<string>(["/"])
@@ -17,6 +21,7 @@ function ScrollTopOnRoute() {
   return null
 }
 export default function MainLayout() {
+  const unavailable = useSyncExternalStore(subscribeToService, isServiceUnavailable, () => false)
   const { pathname } = useLocation()
   const mainRef = useRef<HTMLElement | null>(null)
 
@@ -45,7 +50,8 @@ export default function MainLayout() {
         className="flex-1 focus:outline-none"
       >
         <ScrollTopOnRoute/>
-        <Outlet />
+        <DemoMode />
+        {!DEMO_MODE && unavailable ? <ServiceUnavailable /> : <Outlet />}
       </main>
 
       <Footer />

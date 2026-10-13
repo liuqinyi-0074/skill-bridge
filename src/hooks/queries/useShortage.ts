@@ -13,7 +13,7 @@ export function useShortage(anzscoCode: string) {
     enabled: Boolean(anzscoCode),
     staleTime: 10 * 60 * 1000,        
     gcTime: 15 * 60 * 1000,           
-    retry: 2,                          
+    retry: false,
     retryDelay: 1000,                  
     refetchOnWindowFocus: false,       
     refetchOnMount: false,             

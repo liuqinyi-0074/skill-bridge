@@ -13,6 +13,6 @@ export function useGlossaryDetail(keyword: string | null) {
     queryFn: () => getDetailByKeyword(keyword!),
     enabled: Boolean(keyword && keyword.trim()),
     staleTime: 10 * 60 * 1000, // Cache for 10 minutes
-    retry: 1,
+    retry: false,
   });
 }

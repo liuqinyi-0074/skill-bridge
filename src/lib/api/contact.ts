@@ -16,7 +16,7 @@ export async function sendFeedback(body: FeedbackReq): Promise<FeedbackRes> {
   }
   if (typeof raw === "string") {
     const normalized = raw.trim().toLowerCase();
-    if (normalized === "" || normalized === "ok" || normalized === "success") {
+    if (normalized === "ok" || normalized === "success") {
       return { status: "ok", id: "" };
     }
   }

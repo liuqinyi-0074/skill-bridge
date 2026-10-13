@@ -59,18 +59,18 @@ export default function AnalyzerTraining(): React.ReactElement {
   /** Persist advice into Redux after load succeeds (store empty list too) */
   useEffect(() => {
     if (!selectedJob) return;
-    if (isFetching || isError) return;
+    if (isFetching || isError || !data) return;
     dispatch(
       setTrainingAdvice({
         occupation: { code: selectedJob.code, title: selectedJob.title },
         courses,
       })
     );
-  }, [dispatch, selectedJob, isFetching, isError, courses]);
+  }, [dispatch, selectedJob, isFetching, isError, data, courses]);
 
   /** Finish → push to Profile with route-state fallback */
   const handleFinish = (): void => {
-    if (!selectedJob) return;
+    if (!selectedJob || isFetching || isError || !data) return;
 
     const state: AnalyzerRouteState & { notice: string } = {
       roles: store.chosenRoles,
@@ -130,7 +130,7 @@ export default function AnalyzerTraining(): React.ReactElement {
       )}
 
       <footer className="mt-10 flex items-center justify-end">
-        <Button variant="primary" size="md" onClick={handleFinish}>
+        <Button variant="primary" size="md" onClick={handleFinish} disabled={!selectedJob || isFetching || isError || !data}>
           Finish
         </Button>
       </footer>

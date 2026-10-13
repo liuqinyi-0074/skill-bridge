@@ -1,3 +1,6 @@
+import { APP_CONFIG } from "../../config/runtime";
+import { apiUrl } from "../../config/environment";
+import { DEMO_MODE } from "../demo/mode";
 import { onCLS, onINP, onLCP, onFCP, onTTFB } from "web-vitals";
 import type {Metric} from "web-vitals";
 /** Payload shape sent to the backend RUM endpoint */
@@ -15,7 +18,8 @@ type VitalPayload = {
 
 /** Best-effort send. Uses sendBeacon if available, falls back to fetch */
 function postMetric(payload: VitalPayload): void {
-  const endpoint = `${import.meta.env.VITE_API_BASE}rum/vitals`;
+  if (DEMO_MODE) return;
+  const endpoint = apiUrl(APP_CONFIG.apiBase, "/rum/vitals");
   const body = JSON.stringify(payload);
   if ("sendBeacon" in navigator) {
     const blob = new Blob([body], { type: "application/json" });

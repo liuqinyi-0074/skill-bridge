@@ -1,3 +1,4 @@
+import { APP_CONFIG } from "./config/runtime";
 import "./styles/index.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
@@ -16,7 +17,7 @@ initSentry();
 registerDefaultSummaryBuilders();
 registerAbilityCountsBuilder();
 registerJobSummaryBuilder();
-registerSW({
+if (APP_CONFIG.pwaEnabled) registerSW({
   // Called when a new SW is available; we ask it to apply immediately.
   onNeedRefresh() { /* You could show a toast; plugin can auto-update */ },
   onOfflineReady() { /* App shell is cached for offline usage */ }
@@ -24,9 +25,11 @@ registerSW({
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
+      networkMode: "always",
       staleTime: 30_000,
       gcTime: 5 * 60_000,
-      retry: 1,
+      retry: false,
+      refetchOnReconnect: false,
       refetchOnWindowFocus: false,
     },
   },

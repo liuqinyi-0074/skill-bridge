@@ -4,7 +4,7 @@ import type { ShortageRes } from "../../../types/shortage";
 /**
  * POST /api/shortage/by-anzsco
  * Body: { "anzsco_code": "111111" }
- * Increased timeout for slow API response
+ * Requests use the shared bounded timeout
  */
 export async function getShortageByAnzsco(code: string): Promise<ShortageRes> {
   const c = code.trim();
@@ -16,7 +16,7 @@ export async function getShortageByAnzsco(code: string): Promise<ShortageRes> {
       "/api/shortage/by-anzsco",
       { anzsco_code: c },
       undefined, // no query params
-      { timeoutMs: 60000 } // 60 seconds timeout
+      { timeoutMs: 10000 } // bounded Live Mode request
     );
     
     return result;

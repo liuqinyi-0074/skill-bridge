@@ -1,3 +1,9 @@
+import {
+  isServiceUnavailable,
+  markServiceUnavailable,
+  ServiceUnavailableError,
+  subscribeToService,
+} from "./availability";
 // Minimal HTTP layer with timeout, AbortSignal support, JSON parsing, and normalized errors.
 // This file is transport-only. Higher layers build URLs and pass RequestOptions here.
 
@@ -9,7 +15,10 @@ export class HttpError extends Error {
   /** Final requested URL */
   readonly url?: string;
 
-  constructor(message: string, opts?: { status?: number; bodyText?: string; url?: string }) {
+  constructor(
+    message: string,
+    opts?: { status?: number; bodyText?: string; url?: string },
+  ) {
     super(message);
     this.name = "HttpError";
     this.status = opts?.status;
@@ -31,42 +40,12 @@ export interface RequestOptions {
 }
 
 /** Default timeout (ms) */
-const DEFAULT_TIMEOUT = 15_000;
+const DEFAULT_TIMEOUT = 10_000;
 
 /** Common headers for JSON requests */
 const baseJsonHeaders: Record<string, string> = {
   Accept: "application/json",
 };
-
-/**
- * Create an AbortSignal that aborts on timeout, while also respecting an upstream signal.
- * If both exist, abort occurs when either one fires.
- */
-function composeSignal(upstream: AbortSignal | undefined, timeoutMs: number): AbortSignal {
-  const controller = new AbortController();
-
-  // Wire upstream
-  if (upstream) {
-    if (upstream.aborted) {
-      controller.abort(upstream.reason);
-    } else {
-      const onAbort = () => controller.abort(upstream.reason);
-      upstream.addEventListener("abort", onAbort, { once: true });
-      controller.signal.addEventListener("abort", () => {
-        upstream.removeEventListener("abort", onAbort);
-      });
-    }
-  }
-
-  // Wire timeout
-  const id = setTimeout(
-    () => controller.abort(new DOMException("Timeout", "AbortError")),
-    Math.max(1, timeoutMs)
-  );
-  controller.signal.addEventListener("abort", () => clearTimeout(id), { once: true });
-
-  return controller.signal;
-}
 
 /** Parse response as JSON if content-type indicates JSON, else as text. Throw on non-2xx. */
 async function parseJsonOrText<T>(res: Response, url: string): Promise<T> {
@@ -74,10 +53,25 @@ async function parseJsonOrText<T>(res: Response, url: string): Promise<T> {
   const isJson = ctype.includes("application/json") || ctype.includes("+json");
 
   if (res.ok) {
-    if (isJson) return (await res.json()) as T;
+    if (
+      res.status === 204 &&
+      new URL(url, window.location.origin).pathname.endsWith("/api/contact")
+    )
+      return null as T;
+    if (res.status === 204) throw new ServiceUnavailableError();
+    if (isJson) {
+      const data: unknown = await res.json();
+      if (data === null) throw new ServiceUnavailableError();
+      return data as T;
+    }
     const text = await res.text();
-    // If server returns non-JSON 2xx, we pass through text as T (caller decides).
-    return (text as unknown) as T;
+    // Only explicit plain-text acknowledgements from contact are supported.
+    if (
+      new URL(url, window.location.origin).pathname.endsWith("/api/contact") &&
+      /^(ok|success)$/i.test(text.trim())
+    )
+      return text as T;
+    throw new ServiceUnavailableError();
   }
 
   // Non-2xx → include (truncated) body for diagnostics
@@ -89,30 +83,71 @@ async function parseJsonOrText<T>(res: Response, url: string): Promise<T> {
   } catch {
     bodyText = "";
   }
-  throw new HttpError(`HTTP ${res.status} ${res.statusText}`, { status: res.status, bodyText, url });
+  throw new HttpError(`HTTP ${res.status} ${res.statusText}`, {
+    status: res.status,
+    bodyText,
+    url,
+  });
 }
 
 /** Core fetch wrapper */
 async function coreFetch<T>(
   url: string,
   init: RequestInit,
-  options?: RequestOptions
+  options?: RequestOptions,
 ): Promise<T> {
-  const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT;
-  const signal = composeSignal(options?.signal, timeoutMs);
-
-  const res = await fetch(url, {
-    ...init,
-    headers: {
-      ...baseJsonHeaders,
-      ...(init.headers ?? {}),
-      ...(options?.headers ?? {}),
-    },
-    signal,
-    credentials: options?.credentials, // only include if caller asks
-  });
-
-  return parseJsonOrText<T>(res, url);
+  if (options?.signal?.aborted) throw options.signal.reason;
+  if (isServiceUnavailable()) throw new ServiceUnavailableError();
+  if (!navigator.onLine) {
+    markServiceUnavailable();
+    throw new ServiceUnavailableError();
+  }
+  const controller = new AbortController();
+  const onAbort = () => controller.abort(options?.signal?.reason);
+  options?.signal?.addEventListener("abort", onAbort, { once: true });
+  const unsubscribe = subscribeToService(() =>
+    controller.abort(new ServiceUnavailableError()),
+  );
+  // Cap every request, including legacy callers asking for a longer timeout.
+  const timeoutMs = Math.min(
+    DEFAULT_TIMEOUT,
+    Math.max(1, options?.timeoutMs ?? DEFAULT_TIMEOUT),
+  );
+  const timer = setTimeout(
+    () => controller.abort(new ServiceUnavailableError()),
+    timeoutMs,
+  );
+  try {
+    const res = await fetch(url, {
+      ...init,
+      headers: {
+        ...baseJsonHeaders,
+        ...(init.headers ?? {}),
+        ...(options?.headers ?? {}),
+      },
+      signal: controller.signal,
+      credentials: options?.credentials,
+    });
+    return await parseJsonOrText<T>(res, url);
+  } catch (error) {
+    // A caller cancelling its own request is not a service outage.
+    if (options?.signal?.aborted) throw error;
+    if (
+      error instanceof ServiceUnavailableError ||
+      error instanceof TypeError ||
+      error instanceof SyntaxError ||
+      controller.signal.aborted ||
+      (error instanceof HttpError && (error.status ?? 0) >= 500)
+    ) {
+      markServiceUnavailable();
+      throw new ServiceUnavailableError();
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+    options?.signal?.removeEventListener("abort", onAbort);
+    unsubscribe();
+  }
 }
 
 /** Low-level GET returning typed JSON (or text) */
@@ -122,7 +157,7 @@ export function httpGet<T>(url: string, options?: RequestOptions): Promise<T> {
     {
       method: "GET",
     },
-    options
+    options,
   );
 }
 
@@ -130,7 +165,7 @@ export function httpGet<T>(url: string, options?: RequestOptions): Promise<T> {
 export function httpPost<TReq, TRes>(
   url: string,
   body: TReq,
-  options?: RequestOptions
+  options?: RequestOptions,
 ): Promise<TRes> {
   return coreFetch<TRes>(
     url,
@@ -139,18 +174,21 @@ export function httpPost<TReq, TRes>(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     },
-    options
+    options,
   );
 }
 
 /** Optional: DELETE helper */
-export function httpDelete<T>(url: string, options?: RequestOptions): Promise<T> {
+export function httpDelete<T>(
+  url: string,
+  options?: RequestOptions,
+): Promise<T> {
   return coreFetch<T>(
     url,
     {
       method: "DELETE",
     },
-    options
+    options,
   );
 }
 
@@ -158,7 +196,7 @@ export function httpDelete<T>(url: string, options?: RequestOptions): Promise<T>
 export function httpPut<TReq, TRes>(
   url: string,
   body: TReq,
-  options?: RequestOptions
+  options?: RequestOptions,
 ): Promise<TRes> {
   return coreFetch<TRes>(
     url,
@@ -167,6 +205,6 @@ export function httpPut<TReq, TRes>(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     },
-    options
+    options,
   );
 }

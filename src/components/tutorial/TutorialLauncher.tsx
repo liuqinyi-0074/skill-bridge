@@ -1,3 +1,4 @@
+import { safeStorage } from "../../store/browserStorage";
 // src/components/tutorial/TutorialLauncher.tsx
 // Tutorial launcher with headerOffset-aware absolute positioning.
 // - Mobile: icon-only circular button
@@ -90,11 +91,11 @@ export default function TutorialLauncher({
   // Auto open once per browser based on a stable key
   useEffect(() => {
     if (!autoOpenOnceKey) return;
-    const seen = localStorage.getItem(autoOpenOnceKey) === "1";
+    const seen = safeStorage.getItem(autoOpenOnceKey) === "1";
     if (seen) return;
     const t = window.setTimeout(() => {
       setOpen(true);
-      localStorage.setItem(autoOpenOnceKey, "1");
+      safeStorage.setItem(autoOpenOnceKey, "1");
     }, Math.max(0, autoOpenDelayMs));
     return () => window.clearTimeout(t);
   }, [autoOpenOnceKey, autoOpenDelayMs]);

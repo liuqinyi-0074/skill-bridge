@@ -18,7 +18,7 @@ export function useAbilitiesByCodes(codes: string[] | undefined) {
       gcTime: 60 * 60 * 1000,
       refetchOnMount: "always" as const,
       refetchOnWindowFocus: false,
-      retry: 1,
+      retry: false,
       queryFn: () => getAnzscoSkills(code),
       select: mapSkillsToAbilities, // -> AbilityLite[]
     })),

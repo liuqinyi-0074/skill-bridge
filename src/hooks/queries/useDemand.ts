@@ -44,6 +44,6 @@ export function useDemand(
     },
     enabled,
     staleTime,
-    retry: 1, // one retry on network fail
+    retry: false,
   });
 }
